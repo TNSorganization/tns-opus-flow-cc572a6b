@@ -91,9 +91,7 @@ function AuthPage() {
       />
       <div className="relative w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-foreground">
-            <img src={tnsMark} alt="TNS" className="h-9 w-9 invert" />
-          </div>
+          <img src={tnsMark} alt="TNS" className="mx-auto mb-4 h-14 w-14" />
           <h1 className="text-2xl font-semibold tracking-tight">TNS Operations System</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             One system for attendance, tasks and finance.
