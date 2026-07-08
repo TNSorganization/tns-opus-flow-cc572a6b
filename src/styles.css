@@ -129,6 +129,16 @@
   --status-working: oklch(0.72 0.16 240);  /* blue */
   --status-absent:  oklch(0.65 0.24 25);   /* red */
   --status-off:     oklch(0.55 0.02 265);  /* grey */
+
+  /* Brand palette (prototype) */
+  --brand-purple:  oklch(0.68 0.22 305);   /* #a855f7 */
+  --brand-pink:    oklch(0.66 0.24 355);   /* #ec4899 */
+  --brand-teal:    oklch(0.72 0.13 190);   /* #14b8a6 */
+  --brand-orange:  oklch(0.72 0.19 55);    /* #f97316 */
+  --brand-yellow:  oklch(0.82 0.15 85);    /* #f59e0b */
+  --brand-info:    oklch(0.68 0.17 245);   /* #3b82f6 */
+  --brand-success: oklch(0.72 0.19 150);   /* #22c55e */
+  --brand-danger:  oklch(0.65 0.24 25);    /* #ef4444 */
 }
 
 /* Light mode (opt-in) */
