@@ -79,11 +79,10 @@ function TasksPage() {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: TaskStatus }) => {
-      const patch: Record<string, unknown> = { status };
-      if (status === "completed") {
-        patch.completed_at = new Date().toISOString();
-        patch.progress = 100;
-      }
+      const patch =
+        status === "completed"
+          ? { status, completed_at: new Date().toISOString(), progress: 100 }
+          : { status };
       const { error } = await supabase.from("tasks").update(patch).eq("id", id);
       if (error) throw error;
     },
