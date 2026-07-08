@@ -64,6 +64,17 @@
   --color-status-working: var(--status-working);
   --color-status-absent: var(--status-absent);
   --color-status-off: var(--status-off);
+
+  /* Prototype semantic accents */
+  --color-brand-purple: var(--brand-purple);
+  --color-brand-pink: var(--brand-pink);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-yellow: var(--brand-yellow);
+  --color-brand-info: var(--brand-info);
+  --color-brand-success: var(--brand-success);
+  --color-brand-danger: var(--brand-danger);
+  --color-status-off: var(--status-off);
 }
 
 /* Default = DARK. TOS is a dashboard tool — dark first. */
