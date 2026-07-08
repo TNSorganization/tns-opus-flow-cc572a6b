@@ -82,7 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Button size="icon" variant="ghost" onClick={() => setMobileOpen(true)}>
             <Menu className="h-5 w-5" />
           </Button>
-          <span className="font-semibold tracking-tight">TOS</span>
+          <img src={tnsMark} alt="TNS" className="h-7 w-7" />
         </div>
         <Avatar className="h-8 w-8">
           <AvatarImage src={profile?.avatar_url ?? undefined} />
