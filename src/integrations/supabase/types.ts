@@ -104,6 +104,80 @@ export type Database = {
         }
         Relationships: []
       }
+      document_folders: {
+        Row: {
+          color: string | null
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      documents: {
+        Row: {
+          created_at: string
+          description: string | null
+          file_path: string
+          folder_id: string | null
+          id: string
+          mime_type: string | null
+          name: string
+          size_bytes: number | null
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          file_path: string
+          folder_id?: string | null
+          id?: string
+          mime_type?: string | null
+          name: string
+          size_bytes?: number | null
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          file_path?: string
+          folder_id?: string | null
+          id?: string
+          mime_type?: string | null
+          name?: string
+          size_bytes?: number | null
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "document_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expense_categories: {
         Row: {
           active: boolean
@@ -139,6 +213,7 @@ export type Database = {
           category_id: string | null
           created_at: string
           created_by: string | null
+          currency: string
           department_id: string | null
           entry_date: string
           id: string
@@ -158,6 +233,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          currency?: string
           department_id?: string | null
           entry_date?: string
           id?: string
@@ -177,6 +253,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          currency?: string
           department_id?: string | null
           entry_date?: string
           id?: string
@@ -220,6 +297,7 @@ export type Database = {
           category: string | null
           created_at: string
           created_by: string | null
+          currency: string
           description: string | null
           entry_date: string
           house: string | null
@@ -238,6 +316,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          currency?: string
           description?: string | null
           entry_date?: string
           house?: string | null
@@ -256,6 +335,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          currency?: string
           description?: string | null
           entry_date?: string
           house?: string | null
@@ -406,6 +486,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sops: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          kind: string
+          owner_id: string | null
+          status: string
+          title: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          kind: string
+          owner_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          version?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          owner_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: []
       }
       task_checklist_items: {
         Row: {
