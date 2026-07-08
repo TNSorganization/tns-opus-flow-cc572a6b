@@ -17,6 +17,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import tnsLogo from "@/assets/tns-logo-white.png";
+import tnsMark from "@/assets/tns-mark-white.png";
 
 const nav = [
   { to: "/home", label: "Home", icon: Home },
@@ -80,7 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Button size="icon" variant="ghost" onClick={() => setMobileOpen(true)}>
             <Menu className="h-5 w-5" />
           </Button>
-          <span className="font-semibold tracking-tight">TOS</span>
+          <img src={tnsMark} alt="TNS" className="h-7 w-7" />
         </div>
         <Avatar className="h-8 w-8">
           <AvatarImage src={profile?.avatar_url ?? undefined} />
@@ -97,7 +99,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           />
           <aside className="absolute left-0 top-0 flex h-full w-64 flex-col bg-sidebar">
             <div className="flex items-center justify-between p-4">
-              <span className="font-semibold">TNS Operations</span>
+              <img src={tnsLogo} alt="TNS Organization" className="h-8" />
               <Button size="icon" variant="ghost" onClick={() => setMobileOpen(false)}>
                 <X className="h-5 w-5" />
               </Button>
@@ -125,17 +127,7 @@ function SidebarInner({
   return (
     <>
       <div className="hidden px-5 py-6 lg:block">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
-            <span className="font-mono text-sm font-semibold">T</span>
-          </div>
-          <div>
-            <div className="text-sm font-semibold leading-tight">TNS</div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Operations
-            </div>
-          </div>
-        </div>
+        <img src={tnsLogo} alt="TNS Organization" className="h-9" />
       </div>
       <nav className="flex-1 space-y-0.5 px-3">
         {nav.map((item) => {
