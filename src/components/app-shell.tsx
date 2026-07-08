@@ -127,17 +127,7 @@ function SidebarInner({
   return (
     <>
       <div className="hidden px-5 py-6 lg:block">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
-            <span className="font-mono text-sm font-semibold">T</span>
-          </div>
-          <div>
-            <div className="text-sm font-semibold leading-tight">TNS</div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Operations
-            </div>
-          </div>
-        </div>
+        <img src={tnsLogo} alt="TNS Organization" className="h-9" />
       </div>
       <nav className="flex-1 space-y-0.5 px-3">
         {nav.map((item) => {
