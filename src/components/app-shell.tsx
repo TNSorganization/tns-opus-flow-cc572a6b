@@ -99,7 +99,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           />
           <aside className="absolute left-0 top-0 flex h-full w-64 flex-col bg-sidebar">
             <div className="flex items-center justify-between p-4">
-              <span className="font-semibold">TNS Operations</span>
+              <img src={tnsLogo} alt="TNS Organization" className="h-8" />
               <Button size="icon" variant="ghost" onClick={() => setMobileOpen(false)}>
                 <X className="h-5 w-5" />
               </Button>
