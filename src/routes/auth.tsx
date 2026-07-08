@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import tnsMark from "@/assets/tns-mark-white.png";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
