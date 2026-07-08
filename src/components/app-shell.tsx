@@ -17,6 +17,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import tnsLogo from "@/assets/tns-logo-white.png";
+import tnsMark from "@/assets/tns-mark-white.png";
 
 const nav = [
   { to: "/home", label: "Home", icon: Home },
