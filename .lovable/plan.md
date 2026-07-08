@@ -1,90 +1,85 @@
+# Match the Prototype: Full TOS v2
 
-# TNS Operations System (TOS) — v1 Build Plan
+Adopts the uploaded prototype's look and structure, then wires real backend for every page. Keeps existing Attendance/Tasks/Finance data but reshapes UI, splits pages, and adds three new modules.
 
-One system, one login, four surfaces: **Attendance · Tasks · Finance · Dashboard/Reports**. Built for ~10 staff with room to grow. Knowledge/Documents deferred.
+## Visual System (prototype-faithful)
 
-## Design direction
-- Aesthetic: Linear/Stripe/Notion — minimal, fast, mobile-first, dark mode by default with light toggle.
-- Type: **Geist Sans** (UI) + **Geist Mono** (numbers/timestamps). Tight tracking, generous whitespace.
-- Palette: near-black surfaces, off-white text, one accent (electric indigo), semantic status colors (green/yellow/blue/red/grey per your spec).
-- Motion: subtle — 150ms ease transitions, no bounces.
-- Almost no tables. Cards, KPIs, sparklines, progress rings, bar/area charts (Recharts).
+- Indigo→purple gradients on primary actions, avatars, logo tile.
+- Card style: soft rounded (16px), 1px translucent border, hover lift + shadow.
+- Colored icon tiles per KPI (green/red/blue/purple/orange/teal/pink/yellow).
+- Staff cards with colored 3px top-border by status (present/break/absent/off).
+- Sidebar sections: Overview · Workforce · Finance · Knowledge.
+- Theme toggle: dark (default) + light, persisted in localStorage.
+- Global search box in top bar (staff / tasks / transactions).
+- Toast pattern via existing sonner.
+- Keep Geist typography.
 
-## Modules
+## Navigation restructure
 
-### 1. Attendance
-- Home = 4 giant buttons: Check In / Start Break / End Break / Check Out. State-aware (only shows next valid action).
-- Each event stamps: timestamp, GPS (if granted), user-agent, user.
-- Auto-derived per day: arrival, departure, total hours, break minutes, productive minutes, lateness, overtime.
-- **Live board** (Ops Manager): grid of staff chips color-coded Green/Yellow/Blue/Red/Grey with current status + time-in-status.
-- Weekly/monthly attendance %, avg arrival, avg departure.
+Split current pages and add new ones:
 
-### 2. Productivity (Tasks)
-- Task fields: title, description, department, priority, deadline, assigner, assignee, status, progress %, time spent, checklist, comments, attachments.
-- Statuses: Not Started, In Progress, Waiting, Completed, Cancelled, Overdue (auto-flip past deadline).
-- Views: My Tasks (kanban), All Tasks (filterable), per-employee page.
-- Per-staff **Performance Index** = weighted(Attendance, Completion, Deadline Accuracy, Consistency). Recomputed nightly + on write.
+```
+/dashboard        Executive overview (dual-currency, Who's In, Pending Tasks)
+/attendance      Self actions + Today grid + Weekly chart
+/board           Live status board (keep)
+/tasks           Productivity + KPIs + filters
+/performance     Rankings, breakdown table, ring scores (NEW)
+/income          Split from finance (NEW page)
+/expenses        Split from finance + Pending approvals (NEW page)
+/reports         Daily/Weekly/Monthly/Annual cards + summary chart
+/documents       File library w/ folder tree (NEW)
+/sops            SOPs + Policies (NEW)
+/settings        Keep
+```
 
-### 3. Finance
-- **Flexible** income sources and expense categories — user creates/edits them; nothing hard-coded. Seeded with sensible defaults (Membership, Coaching, Gifts, Loans, Sales, Funding / Salaries, Rent, Utilities, Supplies, Transport, etc.) that can be renamed or deleted.
-- Income entry: date, amount, source, description, received-by, payment method, reference, house, initiative, category, tags, attachment.
-- Expense entry: date, amount, department, purpose, approved-by, paid-by, method, reference, receipt upload, status (Pending → Approved → Paid → Rejected).
-- Auto-computed: today/week/month totals, cash balance, net cash flow, largest income/expense, top source, top spending dept, most-used method, avg transaction, txn count, MoM comparison.
-- Charts: cash-flow area, income vs expense bars, category pie.
-- **Alerts** (rule engine): expense > 2× 30-day avg, income drop > 40%, duplicate ref within 7d, budget exceeded per category.
+## Backend changes (one migration)
 
-### 4. Executive Dashboard
-- Today: present/absent/on-break counts, tasks done/pending, money in/out, cash balance.
-- Week: attendance %, completion %, revenue, expenses, profit, top/lowest performer, most overdue.
-- Month: attendance graph, productivity graph, cash-flow graph, performance ranking, dept summary.
+New / altered tables:
 
-### 5. Reports
-- Daily / Weekly / Monthly (Quarterly/Annual scaffolded).
-- Export **PDF, Excel, CSV**. Generated on-demand server-side.
+- `income_entries` + `expense_entries`: add `currency TEXT NOT NULL DEFAULT 'XCFA'` (CHECK in {'XCFA','USD'}).
+- `documents` — id, folder, name, description, file_path (storage), mime, size, uploaded_by, timestamps. RLS: authenticated read/insert; delete by uploader or admin.
+- `document_folders` — seeded: Contracts, Meeting Minutes, Receipts, Staff Files, Organization.
+- `sops` — id, kind ('sop'|'policy'), title, content (markdown), version, status ('draft'|'active'|'archived'), owner_id, timestamps. RLS: authenticated read; managers write.
+- Storage bucket `documents` (private) with policies mirroring receipts bucket.
+- Performance view: SQL view `staff_performance_v` combining attendance %, task completion %, deadline accuracy over trailing 30 days, per user — read directly by /performance page.
 
-## Roles
-Administrator · Operations Manager · Finance Officer · Department Head · Staff. Enforced via Postgres RLS + `has_role()` security-definer function. Route-level gates in `_authenticated/`.
+Existing tables untouched otherwise. GRANTs + RLS included for every new table.
 
-## Notifications
-In-app notification center + toast. Triggers: late arrival, missing checkout (nightly cron), task overdue, income logged, large expense, approval pending, deadline tomorrow, budget exceeded.
+## Page-by-page implementation
 
-## Search
-Global ⌘K palette: employees, tasks, departments, dates, methods, sources, amounts, categories.
+**Dashboard** — 4 KPI cards (Staff Present, Tasks Completed, Cash XCFA, Cash USD), two doughnut charts (attendance status, task completion), "Who's In" staff grid (live from `attendance_events`), "Pending Tasks" list.
 
-## Technical
+**Attendance** — Existing 4 buttons + staff grid + Recharts weekly bar chart from `attendance_events`.
 
-**Stack:** TanStack Start (already scaffolded) + Lovable Cloud (Supabase) for auth, Postgres, Storage, RLS, realtime.
+**Tasks** — Existing kanban replaced with the prototype's task-list rows: checkbox, title, meta (assignee, department, deadline, priority tag). Filter tabs (All/Pending/Progress/Overdue/Completed).
 
-**Schema (high-level):**
-- `profiles` (id → auth.users, name, department_id, avatar)
-- `user_roles` (user_id, role enum) + `has_role()` SECURITY DEFINER
-- `departments`
-- `attendance_events` (user, type, ts, gps, device) → view `attendance_daily`
-- `tasks` + `task_comments` + `task_attachments` + `task_checklist_items`
-- `income_sources`, `expense_categories`, `payment_methods` (user-editable)
-- `income_entries`, `expense_entries` (+ receipts in Storage)
-- `performance_scores` (materialized nightly)
-- `notifications`
-- `audit_log`
+**Performance** — Reads `staff_performance_v`. Top / bottom performer cards, horizontal bar chart of scores, breakdown table with per-metric ring scores.
 
-**Realtime:** Attendance board + dashboard KPIs subscribe to changes.
+**Income** — KPIs (today/week/month, top source), Recharts (source doughnut, 14-day line), transactions table, currency toggle filters by `currency`.
 
-**Server functions** for: performance recompute, alert evaluation, report generation (PDF via server-side render, XLSX via `exceljs`).
+**Expenses** — KPIs, dept doughnut, cash-flow line (income vs expense), pending approvals table with Approve/Reject buttons (managers only, updates `status`).
 
-**Files:** Supabase Storage buckets `receipts` (private), `avatars` (public), `task-attachments` (private).
+**Reports** — Four period cards → open a summary sheet, existing CSV export kept, Recharts monthly summary bars.
 
-## Build order (this turn + next)
-1. Enable Lovable Cloud, create schema + RLS + seeds.
-2. Design system (Geist, tokens, dark default, shadcn variants).
-3. Auth + role gate + shell (sidebar nav, top bar, ⌘K).
-4. Attendance module + live board.
-5. Tasks module + kanban.
-6. Finance module + charts + alerts.
-7. Executive Dashboard.
-8. Reports + exports.
-9. Notifications + cron (missing checkout, overdue tasks).
+**Documents** — Folder tree left, doc grid right; upload → Supabase Storage (`documents` bucket) + row in `documents`. Click to download signed URL.
 
-This is a large build — I'll ship it in staged, working slices so you can use each module the moment it lands rather than waiting for the whole thing.
+**SOPs** — Two sections (SOPs / Policies) as list rows. Create/edit modal with markdown textarea; render with simple `react-markdown`.
 
-## Approve to start?
-Reply **go** and I'll enable Cloud, ship the schema + design system + shell + Attendance in the first slice, then move through Tasks → Finance → Dashboard → Reports.
+## Technical notes
+
+- Currency toggle stored per-page in local state; DB column drives filter.
+- All new queries via `supabase` client + TanStack Query.
+- Recharts already in stack; add `react-markdown` for SOPs.
+- Performance view uses `SECURITY INVOKER` so RLS on underlying tables applies.
+- Global search: client-side across cached queries for v1.
+
+## Order
+
+1. Migration (currency + documents + sops + performance view + bucket).
+2. Restyle tokens (styles.css) + app-shell (sidebar sections, top bar search, theme toggle).
+3. Split finance → income.tsx + expenses.tsx (+ approval action).
+4. Restyle dashboard, attendance, tasks pages to prototype cards/lists.
+5. New pages: performance, documents, sops.
+6. Reports page tweaks.
+
+Ships as one large change set. Existing data preserved.

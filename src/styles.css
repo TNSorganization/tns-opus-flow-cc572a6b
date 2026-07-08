@@ -64,6 +64,16 @@
   --color-status-working: var(--status-working);
   --color-status-absent: var(--status-absent);
   --color-status-off: var(--status-off);
+
+  /* Prototype semantic accents */
+  --color-brand-purple: var(--brand-purple);
+  --color-brand-pink: var(--brand-pink);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-yellow: var(--brand-yellow);
+  --color-brand-info: var(--brand-info);
+  --color-brand-success: var(--brand-success);
+  --color-brand-danger: var(--brand-danger);
 }
 
 /* Default = DARK. TOS is a dashboard tool — dark first. */
@@ -119,6 +129,16 @@
   --status-working: oklch(0.72 0.16 240);  /* blue */
   --status-absent:  oklch(0.65 0.24 25);   /* red */
   --status-off:     oklch(0.55 0.02 265);  /* grey */
+
+  /* Brand palette (prototype) */
+  --brand-purple:  oklch(0.68 0.22 305);   /* #a855f7 */
+  --brand-pink:    oklch(0.66 0.24 355);   /* #ec4899 */
+  --brand-teal:    oklch(0.72 0.13 190);   /* #14b8a6 */
+  --brand-orange:  oklch(0.72 0.19 55);    /* #f97316 */
+  --brand-yellow:  oklch(0.82 0.15 85);    /* #f59e0b */
+  --brand-info:    oklch(0.68 0.17 245);   /* #3b82f6 */
+  --brand-success: oklch(0.72 0.19 150);   /* #22c55e */
+  --brand-danger:  oklch(0.65 0.24 25);    /* #ef4444 */
 }
 
 /* Light mode (opt-in) */
@@ -183,4 +203,30 @@
   font-family: var(--font-mono);
   font-feature-settings: "tnum";
   letter-spacing: -0.02em;
+}
+
+@utility tos-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.tos-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px -12px color-mix(in oklab, black 60%, transparent);
+}
+
+@utility icon-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-md);
+  font-size: 1.15rem;
+}
+
+@utility gradient-brand {
+  background-image: linear-gradient(135deg, var(--primary), var(--brand-purple));
 }
