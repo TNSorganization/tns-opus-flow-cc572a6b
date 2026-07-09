@@ -389,6 +389,51 @@ export type Database = {
         }
         Relationships: []
       }
+      matricules: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          email: string | null
+          expires_at: string | null
+          full_name: string | null
+          id: string
+          note: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          expires_at?: string | null
+          full_name?: string | null
+          id?: string
+          note?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          expires_at?: string | null
+          full_name?: string | null
+          id?: string
+          note?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string | null
@@ -684,6 +729,10 @@ export type Database = {
       }
       is_finance: { Args: { _user_id: string }; Returns: boolean }
       is_manager: { Args: { _user_id: string }; Returns: boolean }
+      redeem_matricule: {
+        Args: { _code: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
     }
     Enums: {
       app_role:
