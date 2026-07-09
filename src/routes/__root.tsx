@@ -97,10 +97,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         property: "og:description",
         content:
-          "Attendance, productivity, and finance for TNS — one clean dashboard, zero manual math.",
+          "The operating system for TNS — attendance, tasks, finance, and executive dashboards in one place.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "TNS Operations System" },
+      { name: "twitter:description", content: "The operating system for TNS — attendance, tasks, finance, and executive dashboards in one place." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/b7591faf-86ec-45ea-b059-78259cf163ec" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/b7591faf-86ec-45ea-b059-78259cf163ec" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
