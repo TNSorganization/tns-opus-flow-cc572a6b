@@ -89,7 +89,9 @@ function HomePage() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {allActions.map((t) => {
-          const enabled = state.next.includes(t);
+          // Check-in is always available (starts a new session or overrides).
+          // Others depend on current state.
+          const enabled = t === "check_in" ? true : state.next.includes(t);
           const meta = LABELS[t];
           const Icon = meta.Icon;
           return (
