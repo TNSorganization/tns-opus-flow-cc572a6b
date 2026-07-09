@@ -14,6 +14,7 @@ export const Route = createFileRoute("/_authenticated/board")({
 type Row = { id: string; full_name: string | null; email: string | null; avatar_url: string | null };
 
 function BoardPage() {
+  const qc = useQueryClient();
   const [, force] = useState(0);
   useEffect(() => {
     const id = setInterval(() => force((n) => n + 1), 30_000);
