@@ -24,6 +24,11 @@ function money(n: number) {
 }
 
 function DashboardPage() {
+  useRealtimeInvalidate(
+    "dashboard-live",
+    ["attendance_events", "tasks", "expense_entries", "income_entries"],
+    [["dash-att-today"], ["dash-tasks"], ["dash-expenses"], ["dash-incomes"]],
+  );
   const today = new Date();
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
