@@ -44,18 +44,61 @@ function AuthPage() {
   async function signUpEmail(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
+    const matricule = String(form.get("matricule") ?? "").trim();
+    const email = String(form.get("email"));
+    const password = String(form.get("password"));
+    const fullName = String(form.get("full_name") ?? "");
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email: String(form.get("email")),
-      password: String(form.get("password")),
+
+    // If a matricule was provided, validate it BEFORE creating the account so
+    // we don't leave orphaned accounts around.
+    if (matricule) {
+      const { data: m, error: mErr } = await supabase
+        .from("matricules")
+        .select("id, used_by, expires_at")
+        .eq("code", matricule)
+        .maybeSingle();
+      if (mErr || !m || m.used_by || (m.expires_at && new Date(m.expires_at) < new Date())) {
+        setLoading(false);
+        return toast.error("Invalid or already-used matricule");
+      }
+    }
+
+    const { data: signUpData, error } = await supabase.auth.signUp({
+      email,
+      password,
       options: {
         emailRedirectTo: window.location.origin,
-        data: { full_name: String(form.get("full_name") ?? "") },
+        data: { full_name: fullName },
       },
     });
+    if (error) {
+      setLoading(false);
+      return toast.error(error.message);
+    }
+
+    // Redeem matricule immediately if session is active (auto-confirm off:
+    // session may be null; user redeems after email confirmation on first login).
+    if (matricule && signUpData.session) {
+      const { error: rErr } = await supabase.rpc("redeem_matricule", { _code: matricule });
+      if (rErr) {
+        setLoading(false);
+        return toast.error(`Signup ok but matricule failed: ${rErr.message}`);
+      }
+    } else if (matricule) {
+      // Stash to redeem after email confirm + first login
+      try {
+        localStorage.setItem("pending_matricule", matricule);
+      } catch { /* ignore */ }
+    }
+
     setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("Account created. Check your inbox to confirm your email.");
+    if (signUpData.session) {
+      toast.success("Welcome!");
+      navigate({ to: "/home", replace: true });
+    } else {
+      toast.success("Account created. Check your inbox to confirm your email.");
+    }
   }
 
   async function google() {
