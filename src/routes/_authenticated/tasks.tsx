@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeInvalidate } from "@/hooks/use-realtime";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,6 +52,7 @@ export const Route = createFileRoute("/_authenticated/tasks")({
 function TasksPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  useRealtimeInvalidate("tasks-live", ["tasks", "task_checklist_items"], [["tasks"], ["badge-tasks-overdue"]]);
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["tasks"],

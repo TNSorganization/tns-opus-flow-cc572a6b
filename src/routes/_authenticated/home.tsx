@@ -34,6 +34,20 @@ function HomePage() {
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    const ch = supabase
+      .channel("attendance-self")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "attendance_events" },
+        () => qc.invalidateQueries({ queryKey: ["attendance-today"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [qc]);
+
   const today = new Date();
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["attendance-today"],
@@ -89,7 +103,9 @@ function HomePage() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {allActions.map((t) => {
-          const enabled = state.next.includes(t);
+          // Check-in is always available (starts a new session or overrides).
+          // Others depend on current state.
+          const enabled = t === "check_in" ? true : state.next.includes(t);
           const meta = LABELS[t];
           const Icon = meta.Icon;
           return (

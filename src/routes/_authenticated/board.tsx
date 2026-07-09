@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { deriveStatus, type AttendanceEventType } from "@/lib/attendance";
@@ -14,6 +14,7 @@ export const Route = createFileRoute("/_authenticated/board")({
 type Row = { id: string; full_name: string | null; email: string | null; avatar_url: string | null };
 
 function BoardPage() {
+  const qc = useQueryClient();
   const [, force] = useState(0);
   useEffect(() => {
     const id = setInterval(() => force((n) => n + 1), 30_000);
@@ -50,13 +51,13 @@ function BoardPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "attendance_events" },
-        () => force((n) => n + 1),
+        () => qc.invalidateQueries({ queryKey: ["all-attendance-today"] }),
       )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
-  }, []);
+  }, [qc]);
 
   const byUser = new Map<string, { event_type: AttendanceEventType; event_at: string }[]>();
   for (const e of events) {

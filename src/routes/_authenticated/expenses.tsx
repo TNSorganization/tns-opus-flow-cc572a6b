@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeInvalidate } from "@/hooks/use-realtime";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,11 @@ function ExpensesPage() {
   const qc = useQueryClient();
   const [currency, setCurrency] = useState<Currency>("XCFA");
   const today = new Date();
+  useRealtimeInvalidate(
+    "expenses-live",
+    ["expense_entries"],
+    [["expenses", currency], ["badge-expenses-pending"]],
+  );
 
   const { data: rows = [] } = useQuery({
     queryKey: ["expenses", currency],
