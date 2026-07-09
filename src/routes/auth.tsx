@@ -232,11 +232,25 @@ function AuthPage() {
                     autoComplete="new-password"
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="su-matricule">Matricule</Label>
+                  <Input
+                    id="su-matricule"
+                    name="matricule"
+                    type="text"
+                    placeholder="Code from your administrator"
+                    autoComplete="off"
+                    className="uppercase tracking-wider"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Required unless you're the first user. Ask an administrator to generate one.
+                  </p>
+                </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create account"}
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">
-                  First user becomes administrator.
+                  First user becomes administrator automatically.
                 </p>
               </form>
             </TabsContent>
