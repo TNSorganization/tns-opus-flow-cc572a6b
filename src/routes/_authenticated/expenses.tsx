@@ -35,6 +35,11 @@ function ExpensesPage() {
   const qc = useQueryClient();
   const [currency, setCurrency] = useState<Currency>("XCFA");
   const today = new Date();
+  useRealtimeInvalidate(
+    "expenses-live",
+    ["expense_entries"],
+    [["expenses", currency], ["badge-expenses-pending"]],
+  );
 
   const { data: rows = [] } = useQuery({
     queryKey: ["expenses", currency],
