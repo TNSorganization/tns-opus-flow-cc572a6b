@@ -34,6 +34,20 @@ function HomePage() {
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    const ch = supabase
+      .channel("attendance-self")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "attendance_events" },
+        () => qc.invalidateQueries({ queryKey: ["attendance-today"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [qc]);
+
   const today = new Date();
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["attendance-today"],
