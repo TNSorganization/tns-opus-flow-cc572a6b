@@ -51,13 +51,13 @@ function BoardPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "attendance_events" },
-        () => force((n) => n + 1),
+        () => qc.invalidateQueries({ queryKey: ["all-attendance-today"] }),
       )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
-  }, []);
+  }, [qc]);
 
   const byUser = new Map<string, { event_type: AttendanceEventType; event_at: string }[]>();
   for (const e of events) {
