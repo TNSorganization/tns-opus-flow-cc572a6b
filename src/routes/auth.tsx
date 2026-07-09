@@ -36,8 +36,19 @@ function AuthPage() {
       email: String(form.get("email")),
       password: String(form.get("password")),
     });
+    if (error) {
+      setLoading(false);
+      return toast.error(error.message);
+    }
+    // Redeem any pending matricule stashed at signup time.
+    try {
+      const pending = localStorage.getItem("pending_matricule");
+      if (pending) {
+        const { error: rErr } = await supabase.rpc("redeem_matricule", { _code: pending });
+        if (!rErr) localStorage.removeItem("pending_matricule");
+      }
+    } catch { /* ignore */ }
     setLoading(false);
-    if (error) return toast.error(error.message);
     navigate({ to: "/home", replace: true });
   }
 
