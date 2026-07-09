@@ -51,6 +51,7 @@ export const Route = createFileRoute("/_authenticated/tasks")({
 function TasksPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  useRealtimeInvalidate("tasks-live", ["tasks", "task_checklist_items"], [["tasks"], ["badge-tasks-overdue"]]);
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["tasks"],
