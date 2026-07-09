@@ -103,8 +103,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "TNS Operations System" },
       { name: "twitter:description", content: "The operating system for TNS — attendance, tasks, finance, and executive dashboards in one place." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/b7591faf-86ec-45ea-b059-78259cf163ec" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/b7591faf-86ec-45ea-b059-78259cf163ec" },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/vGmb62dEDDNaLXfNVOpAgZQGnxm2/social-images/social-1783592880649-ID_Brand_Guide.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/vGmb62dEDDNaLXfNVOpAgZQGnxm2/social-images/social-1783592880649-ID_Brand_Guide.webp" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
