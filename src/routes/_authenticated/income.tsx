@@ -29,6 +29,7 @@ import { formatMoney, type Currency } from "@/lib/currency";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
+import { useCurrentRoles, isFinance as isFin } from "@/hooks/use-current-role";
 
 export const Route = createFileRoute("/_authenticated/income")({
   component: IncomePage,
