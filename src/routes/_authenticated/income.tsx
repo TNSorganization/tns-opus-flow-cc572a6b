@@ -43,6 +43,8 @@ const PIE_COLORS = [
 function IncomePage() {
   const [currency, setCurrency] = useState<Currency>("XCFA");
   const today = new Date();
+  const { data: me } = useCurrentRoles();
+  const canRecord = isFin(me?.roles ?? []);
 
   const { data: rows = [] } = useQuery({
     queryKey: ["income", currency],
