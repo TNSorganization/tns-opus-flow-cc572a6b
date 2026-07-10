@@ -720,6 +720,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_delete_user: { Args: { _user_id: string }; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -755,6 +756,7 @@ export type Database = {
         | "completed"
         | "cancelled"
         | "overdue"
+        | "submitted"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -904,6 +906,7 @@ export const Constants = {
         "completed",
         "cancelled",
         "overdue",
+        "submitted",
       ],
     },
   },
