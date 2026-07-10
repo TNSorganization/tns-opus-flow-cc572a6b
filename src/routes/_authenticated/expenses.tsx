@@ -36,6 +36,11 @@ function ExpensesPage() {
   const qc = useQueryClient();
   const [currency, setCurrency] = useState<Currency>("XCFA");
   const today = new Date();
+  const { data: me } = useCurrentRoles();
+  const roles = me?.roles ?? [];
+  const canRecord = isFin(roles);
+  const canRequest = !canRecord && isDH(roles);
+  const canApprove = isFin(roles);
   useRealtimeInvalidate(
     "expenses-live",
     ["expense_entries"],
