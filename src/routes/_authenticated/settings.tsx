@@ -27,21 +27,29 @@ export const Route = createFileRoute("/_authenticated/settings")({
 });
 
 function SettingsPage() {
+  const { data: me } = useCurrentRoles();
+  const admin = isAdmin(me?.roles ?? []);
   return (
     <div className="space-y-6">
       <header>
         <p className="text-sm text-muted-foreground">Enrollment codes, roles, and master data</p>
         <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
       </header>
-      <Tabs defaultValue="matricules">
+      {!admin && (
+        <div className="tos-card flex items-center gap-3 border-brand-yellow/40 bg-brand-yellow/5 text-sm">
+          <ShieldAlert className="h-5 w-5 text-brand-yellow" />
+          <span>Only the CEO / Administrator can generate matricules or fire staff. Other settings are visible below.</span>
+        </div>
+      )}
+      <Tabs defaultValue={admin ? "matricules" : "people"}>
         <TabsList>
-          <TabsTrigger value="matricules">Matricules</TabsTrigger>
+          {admin && <TabsTrigger value="matricules">Matricules</TabsTrigger>}
           <TabsTrigger value="people">People & Roles</TabsTrigger>
           <TabsTrigger value="departments">Departments</TabsTrigger>
           <TabsTrigger value="finance">Finance lists</TabsTrigger>
         </TabsList>
-        <TabsContent value="matricules" className="mt-4"><MatriculesSettings /></TabsContent>
-        <TabsContent value="people" className="mt-4"><PeopleSettings /></TabsContent>
+        {admin && <TabsContent value="matricules" className="mt-4"><MatriculesSettings /></TabsContent>}
+        <TabsContent value="people" className="mt-4"><PeopleSettings isAdmin={admin} currentUserId={me?.userId ?? null} /></TabsContent>
         <TabsContent value="departments" className="mt-4">
           <MasterList
             table="departments"
