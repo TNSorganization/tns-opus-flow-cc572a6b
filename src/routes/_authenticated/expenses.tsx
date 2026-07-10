@@ -299,12 +299,13 @@ function Empty() {
 }
 
 function NewExpenseButton({
-  categories, methods, departments, defaultCurrency,
+  categories, methods, departments, defaultCurrency, mode,
 }: {
   categories: { id: string; name: string }[];
   methods: { id: string; name: string }[];
   departments: { id: string; name: string }[];
   defaultCurrency: Currency;
+  mode: "record" | "request";
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -324,21 +325,24 @@ function NewExpenseButton({
       department_id: (fd.get("department_id") as string) || null,
       payment_method_id: (fd.get("payment_method_id") as string) || null,
       reference: String(fd.get("reference") || "") || null,
+      status: "pending",
       created_by: u.user?.id,
     });
     setLoading(false);
     if (error) return toast.error(error.message);
-    toast.success("Expense recorded");
+    toast.success(mode === "record" ? "Expense recorded" : "Fund request submitted");
     qc.invalidateQueries({ queryKey: ["expenses"] });
     qc.invalidateQueries({ queryKey: ["badge-expenses-pending"] });
     setOpen(false);
   }
 
+  const label = mode === "record" ? "Record Expense" : "Request Funds";
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="bg-brand-danger text-white hover:opacity-90">
-          <Plus className="mr-1.5 h-4 w-4" /> Record Expense
+          <Plus className="mr-1.5 h-4 w-4" /> {label}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
