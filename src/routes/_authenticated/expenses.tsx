@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeInvalidate } from "@/hooks/use-realtime";
 import { Button } from "@/components/ui/button";
+import { useCurrentRoles, isFinance as isFin, isDeptHead as isDH } from "@/hooks/use-current-role";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
