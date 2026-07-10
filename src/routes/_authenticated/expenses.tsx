@@ -257,7 +257,7 @@ function ExpensesPage() {
                   <td className="px-4 py-3">{nameOf(r.created_by)}</td>
                   <td className="px-4 py-3"><StatusBadge s={r.status} /></td>
                   <td className="px-4 py-3">
-                    {r.status === "pending" ? (
+                    {r.status === "pending" && canApprove ? (
                       <div className="flex justify-end gap-1">
                         <Button size="icon" variant="outline" className="h-7 w-7 text-brand-success"
                           onClick={() => approve.mutate({ id: r.id, status: "approved" })}>
