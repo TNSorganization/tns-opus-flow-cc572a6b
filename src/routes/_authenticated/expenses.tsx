@@ -150,12 +150,20 @@ function ExpensesPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <NewExpenseButton
-          categories={categories}
-          methods={methods}
-          departments={departments}
-          defaultCurrency={currency}
-        />
+        {(canRecord || canRequest) && (
+          <NewExpenseButton
+            categories={categories}
+            methods={methods}
+            departments={departments}
+            defaultCurrency={currency}
+            mode={canRecord ? "record" : "request"}
+          />
+        )}
+        {!canRecord && !canRequest && (
+          <span className="text-xs text-muted-foreground">
+            View-only. Ask Finance to record entries, or a Head of Department to request funds.
+          </span>
+        )}
         <div className="inline-flex rounded-md border border-border bg-muted/40 p-1">
           {(["XCFA", "USD"] as Currency[]).map((c) => (
             <button key={c} onClick={() => setCurrency(c)}
