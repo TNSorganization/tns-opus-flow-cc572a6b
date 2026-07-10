@@ -346,7 +346,7 @@ function NewExpenseButton({
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Record Expense</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{label}</DialogTitle></DialogHeader>
         <form onSubmit={submit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
