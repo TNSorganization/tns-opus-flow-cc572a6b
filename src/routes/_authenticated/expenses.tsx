@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeInvalidate } from "@/hooks/use-realtime";
 import { Button } from "@/components/ui/button";
+import { useCurrentRoles, isFinance as isFin, isDeptHead as isDH } from "@/hooks/use-current-role";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -35,6 +36,11 @@ function ExpensesPage() {
   const qc = useQueryClient();
   const [currency, setCurrency] = useState<Currency>("XCFA");
   const today = new Date();
+  const { data: me } = useCurrentRoles();
+  const roles = me?.roles ?? [];
+  const canRecord = isFin(roles);
+  const canRequest = !canRecord && isDH(roles);
+  const canApprove = isFin(roles);
   useRealtimeInvalidate(
     "expenses-live",
     ["expense_entries"],
@@ -144,12 +150,20 @@ function ExpensesPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <NewExpenseButton
-          categories={categories}
-          methods={methods}
-          departments={departments}
-          defaultCurrency={currency}
-        />
+        {(canRecord || canRequest) && (
+          <NewExpenseButton
+            categories={categories}
+            methods={methods}
+            departments={departments}
+            defaultCurrency={currency}
+            mode={canRecord ? "record" : "request"}
+          />
+        )}
+        {!canRecord && !canRequest && (
+          <span className="text-xs text-muted-foreground">
+            View-only. Ask Finance to record entries, or a Head of Department to request funds.
+          </span>
+        )}
         <div className="inline-flex rounded-md border border-border bg-muted/40 p-1">
           {(["XCFA", "USD"] as Currency[]).map((c) => (
             <button key={c} onClick={() => setCurrency(c)}
@@ -243,7 +257,7 @@ function ExpensesPage() {
                   <td className="px-4 py-3">{nameOf(r.created_by)}</td>
                   <td className="px-4 py-3"><StatusBadge s={r.status} /></td>
                   <td className="px-4 py-3">
-                    {r.status === "pending" ? (
+                    {r.status === "pending" && canApprove ? (
                       <div className="flex justify-end gap-1">
                         <Button size="icon" variant="outline" className="h-7 w-7 text-brand-success"
                           onClick={() => approve.mutate({ id: r.id, status: "approved" })}>
@@ -285,12 +299,13 @@ function Empty() {
 }
 
 function NewExpenseButton({
-  categories, methods, departments, defaultCurrency,
+  categories, methods, departments, defaultCurrency, mode,
 }: {
   categories: { id: string; name: string }[];
   methods: { id: string; name: string }[];
   departments: { id: string; name: string }[];
   defaultCurrency: Currency;
+  mode: "record" | "request";
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -310,25 +325,28 @@ function NewExpenseButton({
       department_id: (fd.get("department_id") as string) || null,
       payment_method_id: (fd.get("payment_method_id") as string) || null,
       reference: String(fd.get("reference") || "") || null,
+      status: "pending",
       created_by: u.user?.id,
     });
     setLoading(false);
     if (error) return toast.error(error.message);
-    toast.success("Expense recorded");
+    toast.success(mode === "record" ? "Expense recorded" : "Fund request submitted");
     qc.invalidateQueries({ queryKey: ["expenses"] });
     qc.invalidateQueries({ queryKey: ["badge-expenses-pending"] });
     setOpen(false);
   }
 
+  const label = mode === "record" ? "Record Expense" : "Request Funds";
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="bg-brand-danger text-white hover:opacity-90">
-          <Plus className="mr-1.5 h-4 w-4" /> Record Expense
+          <Plus className="mr-1.5 h-4 w-4" /> {label}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Record Expense</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{label}</DialogTitle></DialogHeader>
         <form onSubmit={submit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

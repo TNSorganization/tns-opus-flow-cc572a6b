@@ -37,16 +37,27 @@ function PerformancePage() {
       (await supabase.from("tasks").select("assigned_to, status, deadline, completed_at").gte("created_at", from)).data ?? [],
   });
 
+  // Total working days = distinct days ANY employee checked in during the window.
+  // Fallback to elapsed days if nothing recorded yet.
+  const workingDays = (() => {
+    const s = new Set(
+      att.filter((e) => e.event_type === "check_in").map((e) => e.event_at.slice(0, 10)),
+    );
+    return Math.max(s.size, 1);
+  })();
+
   const rows: Row[] = profiles.map((p) => {
     const daysPresent = new Set(
       att.filter((e) => e.user_id === p.id && e.event_type === "check_in").map((e) => e.event_at.slice(0, 10)),
     ).size;
-    const attendance = Math.min(100, Math.round((daysPresent / 22) * 100));
+    const attendance = Math.min(100, Math.round((daysPresent / workingDays) * 100));
     const my = tasks.filter((t) => t.assigned_to === p.id);
-    const done = my.filter((t) => t.status === "completed");
+    // Count both validated and submitted as "done" progress
+    const done = my.filter((t) => t.status === "completed" || t.status === "submitted");
+    const validated = my.filter((t) => t.status === "completed");
     const completion = my.length ? Math.round((done.length / my.length) * 100) : 0;
-    const onTime = done.filter((t) => t.completed_at && t.deadline && new Date(t.completed_at) <= new Date(t.deadline));
-    const deadline = done.length ? Math.round((onTime.length / done.length) * 100) : 0;
+    const onTime = validated.filter((t) => t.completed_at && t.deadline && new Date(t.completed_at) <= new Date(t.deadline));
+    const deadline = validated.length ? Math.round((onTime.length / validated.length) * 100) : 0;
     const score = Math.round(attendance * 0.4 + completion * 0.4 + deadline * 0.2);
     return { id: p.id, name: p.full_name || p.email || "—", attendance, completion, deadline, score };
   }).sort((a, b) => b.score - a.score);

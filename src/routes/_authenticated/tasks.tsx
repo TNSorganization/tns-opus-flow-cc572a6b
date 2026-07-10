@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeInvalidate } from "@/hooks/use-realtime";
+import { useCurrentRoles, isOps } from "@/hooks/use-current-role";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, CheckCircle2, Send, ShieldCheck } from "lucide-react";
 import { format, isPast } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -34,7 +35,7 @@ type TaskPriority = Database["public"]["Enums"]["task_priority"];
 const STATUSES: { key: TaskStatus; label: string }[] = [
   { key: "not_started", label: "Not Started" },
   { key: "in_progress", label: "In Progress" },
-  { key: "waiting", label: "Waiting" },
+  { key: "submitted", label: "Awaiting Validation" },
   { key: "completed", label: "Completed" },
 ];
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
@@ -52,6 +53,9 @@ export const Route = createFileRoute("/_authenticated/tasks")({
 function TasksPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const { data: me } = useCurrentRoles();
+  const canCreate = isOps(me?.roles ?? []);
+  const canValidate = canCreate;
   useRealtimeInvalidate("tasks-live", ["tasks", "task_checklist_items"], [["tasks"], ["badge-tasks-overdue"]]);
 
   const { data: tasks = [], isLoading } = useQuery({
@@ -68,10 +72,8 @@ function TasksPage() {
 
   const { data: people = [] } = useQuery({
     queryKey: ["people"],
-    queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("id, full_name, email");
-      return data ?? [];
-    },
+    queryFn: async () =>
+      (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
   });
 
   const nameOf = (id: string | null) => {
@@ -88,24 +90,34 @@ function TasksPage() {
       const { error } = await supabase.from("tasks").update(patch).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success(v.status === "completed" ? "Task validated" : "Task updated");
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   return (
     <div className="space-y-6">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <p className="text-sm text-muted-foreground">Track execution across the team</p>
+          <p className="text-sm text-muted-foreground">
+            {canCreate
+              ? "Assign work and validate submissions"
+              : "Progress and submit your work for validation"}
+          </p>
           <h1 className="text-3xl font-semibold tracking-tight">Tasks</h1>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-1.5 h-4 w-4" /> New task
-            </Button>
-          </DialogTrigger>
-          <NewTaskDialog people={people} onDone={() => setOpen(false)} />
-        </Dialog>
+        {canCreate && (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-1.5 h-4 w-4" /> New task
+              </Button>
+            </DialogTrigger>
+            <NewTaskDialog people={people} onDone={() => setOpen(false)} />
+          </Dialog>
+        )}
       </header>
 
       {isLoading ? (
@@ -113,13 +125,7 @@ function TasksPage() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-4">
           {STATUSES.map((col) => {
-            const items = tasks.filter((t) => {
-              if (col.key === "not_started" && t.status === "not_started") return true;
-              if (col.key === "in_progress" && t.status === "in_progress") return true;
-              if (col.key === "waiting" && t.status === "waiting") return true;
-              if (col.key === "completed" && t.status === "completed") return true;
-              return false;
-            });
+            const items = tasks.filter((t) => t.status === col.key);
             return (
               <div key={col.key} className="surface p-3">
                 <div className="mb-3 flex items-center justify-between px-1">
@@ -134,6 +140,7 @@ function TasksPage() {
                   ) : (
                     items.map((t) => {
                       const overdue = t.deadline && isPast(new Date(t.deadline)) && t.status !== "completed";
+                      const mine = t.assigned_to === me?.userId;
                       return (
                         <div
                           key={t.id}
@@ -168,23 +175,14 @@ function TasksPage() {
                               </span>
                             )}
                           </div>
-                          <Select
-                            value={t.status}
-                            onValueChange={(v) =>
-                              updateStatus.mutate({ id: t.id, status: v as TaskStatus })
-                            }
-                          >
-                            <SelectTrigger className="mt-2 h-7 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {STATUSES.map((s) => (
-                                <SelectItem key={s.key} value={s.key}>
-                                  {s.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+
+                          {/* Action row: role & state-aware */}
+                          <TaskActions
+                            task={t}
+                            mine={mine}
+                            canValidate={canValidate}
+                            onMove={(s) => updateStatus.mutate({ id: t.id, status: s })}
+                          />
                         </div>
                       );
                     })
@@ -194,6 +192,54 @@ function TasksPage() {
             );
           })}
         </div>
+      )}
+    </div>
+  );
+}
+
+function TaskActions({
+  task,
+  mine,
+  canValidate,
+  onMove,
+}: {
+  task: { status: TaskStatus };
+  mine: boolean;
+  canValidate: boolean;
+  onMove: (s: TaskStatus) => void;
+}) {
+  const s = task.status;
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {mine && s === "not_started" && (
+        <Button size="sm" variant="secondary" className="h-7 text-xs" onClick={() => onMove("in_progress")}>
+          Start
+        </Button>
+      )}
+      {mine && s === "in_progress" && (
+        <Button size="sm" className="h-7 text-xs" onClick={() => onMove("submitted")}>
+          <Send className="mr-1 h-3 w-3" /> Submit
+        </Button>
+      )}
+      {canValidate && s === "submitted" && (
+        <Button size="sm" className="h-7 bg-brand-success text-xs hover:bg-brand-success/90" onClick={() => onMove("completed")}>
+          <ShieldCheck className="mr-1 h-3 w-3" /> Validate
+        </Button>
+      )}
+      {canValidate && s === "submitted" && (
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onMove("in_progress")}>
+          Reject
+        </Button>
+      )}
+      {canValidate && s !== "completed" && s !== "submitted" && (
+        <Button size="sm" variant="ghost" className="h-7 text-xs text-brand-success" onClick={() => onMove("completed")}>
+          <CheckCircle2 className="mr-1 h-3 w-3" /> Mark done
+        </Button>
+      )}
+      {canValidate && s === "completed" && (
+        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onMove("in_progress")}>
+          Reopen
+        </Button>
       )}
     </div>
   );
@@ -245,14 +291,10 @@ function NewTaskDialog({
           <div className="space-y-1.5">
             <Label>Priority</Label>
             <Select name="priority" defaultValue="medium">
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {PRIORITIES.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p}
-                  </SelectItem>
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -265,9 +307,7 @@ function NewTaskDialog({
         <div className="space-y-1.5">
           <Label>Assign to</Label>
           <Select name="assigned_to">
-            <SelectTrigger>
-              <SelectValue placeholder="Choose person" />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Choose person" /></SelectTrigger>
             <SelectContent>
               {people.map((p) => (
                 <SelectItem key={p.id} value={p.id}>

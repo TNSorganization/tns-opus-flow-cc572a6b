@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Plus, Trash2, Copy, KeyRound, Check } from "lucide-react";
+import { Plus, Trash2, Copy, KeyRound, Check, UserX, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
+import { useCurrentRoles, isAdmin } from "@/hooks/use-current-role";
 import {
   Select,
   SelectContent,
@@ -26,21 +27,29 @@ export const Route = createFileRoute("/_authenticated/settings")({
 });
 
 function SettingsPage() {
+  const { data: me } = useCurrentRoles();
+  const admin = isAdmin(me?.roles ?? []);
   return (
     <div className="space-y-6">
       <header>
         <p className="text-sm text-muted-foreground">Enrollment codes, roles, and master data</p>
         <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
       </header>
-      <Tabs defaultValue="matricules">
+      {!admin && (
+        <div className="tos-card flex items-center gap-3 border-brand-yellow/40 bg-brand-yellow/5 text-sm">
+          <ShieldAlert className="h-5 w-5 text-brand-yellow" />
+          <span>Only the CEO / Administrator can generate matricules or fire staff. Other settings are visible below.</span>
+        </div>
+      )}
+      <Tabs defaultValue={admin ? "matricules" : "people"}>
         <TabsList>
-          <TabsTrigger value="matricules">Matricules</TabsTrigger>
+          {admin && <TabsTrigger value="matricules">Matricules</TabsTrigger>}
           <TabsTrigger value="people">People & Roles</TabsTrigger>
           <TabsTrigger value="departments">Departments</TabsTrigger>
           <TabsTrigger value="finance">Finance lists</TabsTrigger>
         </TabsList>
-        <TabsContent value="matricules" className="mt-4"><MatriculesSettings /></TabsContent>
-        <TabsContent value="people" className="mt-4"><PeopleSettings /></TabsContent>
+        {admin && <TabsContent value="matricules" className="mt-4"><MatriculesSettings /></TabsContent>}
+        <TabsContent value="people" className="mt-4"><PeopleSettings isAdmin={admin} currentUserId={me?.userId ?? null} /></TabsContent>
         <TabsContent value="departments" className="mt-4">
           <MasterList
             table="departments"
@@ -249,7 +258,7 @@ function MatriculesSettings() {
 }
 
 
-function PeopleSettings() {
+function PeopleSettings({ isAdmin: admin, currentUserId }: { isAdmin: boolean; currentUserId: string | null }) {
   const qc = useQueryClient();
   const { data: profiles = [] } = useQuery({
     queryKey: ["people-full"],
@@ -276,11 +285,24 @@ function PeopleSettings() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["all-roles"] }),
     onError: (e: Error) => toast.error(e.message),
   });
+  const fire = useMutation({
+    mutationFn: async (user_id: string) => {
+      const { error } = await supabase.rpc("admin_delete_user", { _user_id: user_id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Staff removed");
+      qc.invalidateQueries({ queryKey: ["people-full"] });
+      qc.invalidateQueries({ queryKey: ["all-roles"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <div className="surface divide-y divide-border">
       {profiles.map((p) => {
         const userRoles = roles.filter((r) => r.user_id === p.id).map((r) => r.role);
+        const isSelf = p.id === currentUserId;
         return (
           <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
             <div className="min-w-0 flex-1">
@@ -291,25 +313,43 @@ function PeopleSettings() {
               {userRoles.map((r) => (
                 <span key={r} className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary">
                   {r.replace("_", " ")}
-                  <button
-                    onClick={() => removeRole.mutate({ user_id: p.id, role: r as Role })}
-                    className="text-primary/70 hover:text-primary"
-                    title="Remove role"
-                  >
-                    ×
-                  </button>
+                  {admin && (
+                    <button
+                      onClick={() => removeRole.mutate({ user_id: p.id, role: r as Role })}
+                      className="text-primary/70 hover:text-primary"
+                      title="Remove role"
+                    >
+                      ×
+                    </button>
+                  )}
                 </span>
               ))}
-              <Select onValueChange={(v) => addRole.mutate({ user_id: p.id, role: v as Role })}>
-                <SelectTrigger className="h-7 w-40 text-xs">
-                  <SelectValue placeholder="Add role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLES.filter((r) => !userRoles.includes(r)).map((r) => (
-                    <SelectItem key={r} value={r}>{r.replace("_", " ")}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {admin && (
+                <Select onValueChange={(v) => addRole.mutate({ user_id: p.id, role: v as Role })}>
+                  <SelectTrigger className="h-7 w-40 text-xs">
+                    <SelectValue placeholder="Add role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLES.filter((r) => !userRoles.includes(r)).map((r) => (
+                      <SelectItem key={r} value={r}>{r.replace("_", " ")}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {admin && !isSelf && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={() => {
+                    if (confirm(`Permanently remove ${p.full_name || p.email}? This deletes their account, roles, and unassigns their tasks.`)) {
+                      fire.mutate(p.id);
+                    }
+                  }}
+                >
+                  <UserX className="h-3.5 w-3.5" /> Fire
+                </Button>
+              )}
             </div>
           </div>
         );

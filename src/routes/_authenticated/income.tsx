@@ -29,6 +29,7 @@ import { formatMoney, type Currency } from "@/lib/currency";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
+import { useCurrentRoles, isFinance as isFin } from "@/hooks/use-current-role";
 
 export const Route = createFileRoute("/_authenticated/income")({
   component: IncomePage,
@@ -42,6 +43,8 @@ const PIE_COLORS = [
 function IncomePage() {
   const [currency, setCurrency] = useState<Currency>("XCFA");
   const today = new Date();
+  const { data: me } = useCurrentRoles();
+  const canRecord = isFin(me?.roles ?? []);
 
   const { data: rows = [] } = useQuery({
     queryKey: ["income", currency],
@@ -110,11 +113,17 @@ function IncomePage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <NewIncomeButton
-          sources={sources}
-          methods={methods}
-          defaultCurrency={currency}
-        />
+        {canRecord ? (
+          <NewIncomeButton
+            sources={sources}
+            methods={methods}
+            defaultCurrency={currency}
+          />
+        ) : (
+          <span className="text-xs text-muted-foreground">
+            View-only. Only Finance can record income.
+          </span>
+        )}
         <div className="inline-flex rounded-md border border-border bg-muted/40 p-1">
           {(["XCFA", "USD"] as Currency[]).map((c) => (
             <button
