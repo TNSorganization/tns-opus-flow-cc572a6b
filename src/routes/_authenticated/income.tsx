@@ -113,11 +113,17 @@ function IncomePage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <NewIncomeButton
-          sources={sources}
-          methods={methods}
-          defaultCurrency={currency}
-        />
+        {canRecord ? (
+          <NewIncomeButton
+            sources={sources}
+            methods={methods}
+            defaultCurrency={currency}
+          />
+        ) : (
+          <span className="text-xs text-muted-foreground">
+            View-only. Only Finance can record income.
+          </span>
+        )}
         <div className="inline-flex rounded-md border border-border bg-muted/40 p-1">
           {(["XCFA", "USD"] as Currency[]).map((c) => (
             <button
