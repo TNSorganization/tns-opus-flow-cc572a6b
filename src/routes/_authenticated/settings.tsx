@@ -420,7 +420,7 @@ function SalariesTab() {
   });
   async function runPayroll() {
     setRunning(true);
-    const { data, error } = await supabase.rpc("run_payroll", { _period: period, _note: note || null });
+    const { data, error } = await supabase.rpc("run_payroll", { _period: period, _note: note || undefined });
     setRunning(false);
     if (error) return toast.error(error.message);
     toast.success(`Payroll run: ${data} people paid`);

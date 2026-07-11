@@ -37,8 +37,8 @@ function ProfilePage() {
     const fd = new FormData(e.currentTarget);
     setSaving(true);
     const { error } = await supabase.from("profiles").update({
-      full_name: String(fd.get("full_name") || "") || null,
-      job_title: String(fd.get("job_title") || "") || null,
+      full_name: String(fd.get("full_name") || "") || undefined,
+      job_title: String(fd.get("job_title") || "") || undefined,
     }).eq("id", profile.id);
     setSaving(false);
     if (error) return toast.error(error.message);
