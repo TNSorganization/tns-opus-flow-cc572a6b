@@ -742,6 +742,8 @@ export type Database = {
         | "finance_officer"
         | "department_head"
         | "staff"
+        | "ceo"
+        | "programs_officer"
       attendance_event_type:
         | "check_in"
         | "break_start"
@@ -890,6 +892,8 @@ export const Constants = {
         "finance_officer",
         "department_head",
         "staff",
+        "ceo",
+        "programs_officer",
       ],
       attendance_event_type: [
         "check_in",
