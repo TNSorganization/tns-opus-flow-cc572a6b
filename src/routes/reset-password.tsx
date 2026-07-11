@@ -20,23 +20,25 @@ function ResetPasswordPage() {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const password = String(form.get("password"));
-    if (password.length < 8) return toast.error("Password must be at least 8 characters.");
+    if (!/^\d{6}$/.test(password)) return toast.error("PIN must be 6 digits.");
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ password });
     setLoading(false);
     if (error) return toast.error(error.message);
-    toast.success("Password updated. Signing you in.");
+    toast.success("PIN updated. Signing you in.");
     navigate({ to: "/home", replace: true });
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="surface w-full max-w-md p-6">
-        <h1 className="text-xl font-semibold">Set a new password</h1>
+        <h1 className="text-xl font-semibold">Set a new 6-digit PIN</h1>
         <form onSubmit={submit} className="mt-6 space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="pw">New password</Label>
-            <Input id="pw" name="password" type="password" minLength={8} required />
+            <Label htmlFor="pw">New PIN</Label>
+            <Input id="pw" name="password" type="password" inputMode="numeric"
+              pattern="\d{6}" maxLength={6} minLength={6} required
+              className="tracking-[0.5em] text-center font-mono" />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             Update password
