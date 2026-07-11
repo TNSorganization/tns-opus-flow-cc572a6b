@@ -483,11 +483,10 @@ function SchedulesTab() {
   });
   const schedMap = new Map(schedules.map((s) => [s.user_id, s]));
   async function toggle(user_id: string, day: (typeof WEEKDAYS)[number], on: boolean) {
-    const current = schedMap.get(user_id) ?? {
-      user_id, monday: true, tuesday: true, wednesday: true, thursday: true, friday: true, saturday: false, sunday: false,
-    };
-    const next = { ...current, [day]: on };
-    const { error } = await supabase.from("work_schedules").upsert(next, { onConflict: "user_id" });
+    const current = schedMap.get(user_id);
+    const base = { monday: true, tuesday: true, wednesday: true, thursday: true, friday: true, saturday: false, sunday: false };
+    const next = { user_id, ...base, ...(current ?? {}), [day]: on };
+    const { error } = await supabase.from("work_schedules").upsert(next as never, { onConflict: "user_id" });
     if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["work-schedules"] });
   }
@@ -602,9 +601,9 @@ function NotifyComposer() {
     const { data, error } = await supabase.rpc("send_notification", {
       _title: String(fd.get("title")), _body: String(fd.get("body") || ""),
       _target: target,
-      _target_role: target === "role" ? roleSel : null,
-      _target_user: target === "user" ? userSel : null,
-      _category: "broadcast", _hide_after: null,
+      _target_role: target === "role" ? roleSel : undefined,
+      _target_user: target === "user" ? userSel : undefined,
+      _category: "broadcast", _hide_after: undefined,
     });
     setSending(false);
     if (error) return toast.error(error.message);
