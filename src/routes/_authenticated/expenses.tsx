@@ -4,7 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeInvalidate } from "@/hooks/use-realtime";
 import { Button } from "@/components/ui/button";
-import { useCurrentRoles, isFinance as isFin, isDeptHead as isDH } from "@/hooks/use-current-role";
+import { useCurrentRoles, isFinance as isFin, canRequestFunds as canReq } from "@/hooks/use-current-role";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -39,7 +39,7 @@ function ExpensesPage() {
   const { data: me } = useCurrentRoles();
   const roles = me?.roles ?? [];
   const canRecord = isFin(roles);
-  const canRequest = !canRecord && isDH(roles);
+  const canRequest = !canRecord && canReq(roles);
   const canApprove = isFin(roles);
   useRealtimeInvalidate(
     "expenses-live",

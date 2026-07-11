@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, ArrowDown, Loader2, Calendar, CalendarDays, PieChart as PieIcon } from "lucide-react";
+import { Plus, ArrowDown, Loader2, Calendar, CalendarDays, PieChart as PieIcon, Trash2 } from "lucide-react";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { toast } from "sonner";
 import { KpiCard, SectionHeader } from "@/components/kpi-card";
@@ -41,6 +41,7 @@ const PIE_COLORS = [
 ];
 
 function IncomePage() {
+  const qc = useQueryClient();
   const [currency, setCurrency] = useState<Currency>("XCFA");
   const today = new Date();
   const { data: me } = useCurrentRoles();
@@ -201,11 +202,12 @@ function IncomePage() {
                 <th className="px-4 py-3 text-right">Amount</th>
                 <th className="px-4 py-3">Method</th>
                 <th className="px-4 py-3">Received By</th>
+                {canRecord && <th className="px-4 py-3 text-right">Action</th>}
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={6} className="p-10 text-center text-muted-foreground">No income yet.</td></tr>
+                <tr><td colSpan={canRecord ? 7 : 6} className="p-10 text-center text-muted-foreground">No income yet.</td></tr>
               ) : rows.slice(0, 50).map((r) => (
                 <tr key={r.id} className="border-b border-border/60 hover:bg-muted/30">
                   <td className="px-4 py-3">{format(new Date(r.entry_date), "d MMM yyyy")}</td>
@@ -216,6 +218,20 @@ function IncomePage() {
                   </td>
                   <td className="px-4 py-3">{methods.find((m) => m.id === r.payment_method_id)?.name || "—"}</td>
                   <td className="px-4 py-3">{nameOf(r.created_by)}</td>
+                  {canRecord && (
+                    <td className="px-4 py-3 text-right">
+                      <Button size="icon" variant="ghost" className="h-7 w-7"
+                        onClick={async () => {
+                          if (!confirm("Delete this income entry? This cannot be undone.")) return;
+                          const { error } = await supabase.from("income_entries").delete().eq("id", r.id);
+                          if (error) return toast.error(error.message);
+                          toast.success("Deleted");
+                          qc.invalidateQueries({ queryKey: ["income"] });
+                        }}>
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

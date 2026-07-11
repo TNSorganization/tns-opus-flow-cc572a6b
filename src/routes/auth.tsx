@@ -16,6 +16,9 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+// 6-digit numeric password used across signup / signin / reset.
+const PIN_RE = /^\d{6}$/;
+
 function AuthPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -42,23 +45,17 @@ function AuthPage() {
   async function signInEmail(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
+    const password = String(form.get("password"));
+    if (!PIN_RE.test(password)) return toast.error("PIN must be 6 digits");
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({
       email: String(form.get("email")),
-      password: String(form.get("password")),
+      password,
     });
     if (error) {
       setLoading(false);
       return toast.error(error.message);
     }
-    // Redeem any pending matricule stashed at signup time.
-    try {
-      const pending = localStorage.getItem("pending_matricule");
-      if (pending) {
-        const { error: rErr } = await supabase.rpc("redeem_matricule", { _code: pending });
-        if (!rErr) localStorage.removeItem("pending_matricule");
-      }
-    } catch { /* ignore */ }
     setLoading(false);
     navigate({ to: "/home", replace: true });
   }
@@ -70,10 +67,9 @@ function AuthPage() {
     const email = String(form.get("email"));
     const password = String(form.get("password"));
     const fullName = String(form.get("full_name") ?? "");
+    if (!PIN_RE.test(password)) return toast.error("PIN must be 6 digits");
     setLoading(true);
 
-    // If a matricule was provided, validate it BEFORE creating the account so
-    // we don't leave orphaned accounts around.
     if (matricule) {
       const { data: m, error: mErr } = await supabase
         .from("matricules")
@@ -99,8 +95,6 @@ function AuthPage() {
       return toast.error(error.message);
     }
 
-    // Redeem matricule immediately if session is active (auto-confirm off:
-    // session may be null; user redeems after email confirmation on first login).
     if (matricule && signUpData.session) {
       const { error: rErr } = await supabase.rpc("redeem_matricule", { _code: matricule });
       if (rErr) {
@@ -108,7 +102,6 @@ function AuthPage() {
         return toast.error(`Signup ok but matricule failed: ${rErr.message}`);
       }
     } else if (matricule) {
-      // Stash to redeem after email confirm + first login
       try {
         localStorage.setItem("pending_matricule", matricule);
       } catch { /* ignore */ }
@@ -116,7 +109,7 @@ function AuthPage() {
 
     setLoading(false);
     if (signUpData.session) {
-      toast.success("Welcome!");
+      toast.success("Welcome! Now confirm your matricule in Settings to unlock the app.");
       navigate({ to: "/home", replace: true });
     } else {
       toast.success("Account created. Check your inbox to confirm your email.");
@@ -147,43 +140,26 @@ function AuthPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-background px-4">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-40"
-        style={{
-          background:
-            "radial-gradient(ellipse at top, color-mix(in oklab, var(--primary) 25%, transparent), transparent 55%)",
-        }}
-      />
+      <div className="pointer-events-none absolute inset-0 opacity-40"
+        style={{ background: "radial-gradient(ellipse at top, color-mix(in oklab, var(--primary) 25%, transparent), transparent 55%)" }} />
       <div className="relative w-full max-w-md">
         <div className="mb-8 text-center">
           <img src={tnsMark} alt="TNS" className="mx-auto mb-4 h-14 w-14" />
           <h1 className="text-2xl font-semibold tracking-tight">TNS Operations System</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            One system for attendance, tasks and finance.
+            Sign in with your 6-digit PIN.
           </p>
         </div>
 
         <Card className="surface p-6">
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={google}
-            disabled={loading}
-            type="button"
-          >
-            <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-              <path
-                fill="currentColor"
-                d="M21.35 11.1H12v3.2h5.35c-.23 1.5-1.68 4.4-5.35 4.4-3.22 0-5.85-2.67-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.57-2.47C16.83 4.34 14.66 3.5 12 3.5 7.03 3.5 3 7.53 3 12.5s4.03 9 9 9c5.2 0 8.63-3.65 8.63-8.78 0-.6-.06-1.05-.13-1.62z"
-              />
-            </svg>
+          <Button variant="outline" className="w-full" onClick={google} disabled={loading} type="button">
+            <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24"><path fill="currentColor"
+              d="M21.35 11.1H12v3.2h5.35c-.23 1.5-1.68 4.4-5.35 4.4-3.22 0-5.85-2.67-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.57-2.47C16.83 4.34 14.66 3.5 12 3.5 7.03 3.5 3 7.53 3 12.5s4.03 9 9 9c5.2 0 8.63-3.65 8.63-8.78 0-.6-.06-1.05-.13-1.62z"/></svg>
             Continue with Google
           </Button>
 
           <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-            <div className="h-px flex-1 bg-border" />
-            or
-            <div className="h-px flex-1 bg-border" />
+            <div className="h-px flex-1 bg-border" />or<div className="h-px flex-1 bg-border" />
           </div>
 
           <Tabs defaultValue="signin">
@@ -200,21 +176,12 @@ function AuthPage() {
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="si-pw">Password</Label>
-                    <Link
-                      to="/forgot-password"
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      Forgot?
-                    </Link>
+                    <Label htmlFor="si-pw">6-digit PIN</Label>
+                    <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">Forgot?</Link>
                   </div>
-                  <Input
-                    id="si-pw"
-                    name="password"
-                    type="password"
-                    required
-                    autoComplete="current-password"
-                  />
+                  <Input id="si-pw" name="password" type="password" inputMode="numeric"
+                    pattern="\d{6}" maxLength={6} minLength={6} required
+                    autoComplete="current-password" className="tracking-[0.5em] text-center font-mono" />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
@@ -233,35 +200,24 @@ function AuthPage() {
                   <Input id="su-email" name="email" type="email" required autoComplete="email" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="su-pw">Password</Label>
-                  <Input
-                    id="su-pw"
-                    name="password"
-                    type="password"
-                    minLength={8}
-                    required
-                    autoComplete="new-password"
-                  />
+                  <Label htmlFor="su-pw">6-digit PIN</Label>
+                  <Input id="su-pw" name="password" type="password" inputMode="numeric"
+                    pattern="\d{6}" maxLength={6} minLength={6} required
+                    autoComplete="new-password" className="tracking-[0.5em] text-center font-mono" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="su-matricule">Matricule</Label>
-                  <Input
-                    id="su-matricule"
-                    name="matricule"
-                    type="text"
-                    placeholder="Code from your administrator"
-                    autoComplete="off"
-                    className="uppercase tracking-wider"
-                  />
+                  <Input id="su-matricule" name="matricule" type="text" placeholder="Code from the CEO"
+                    autoComplete="off" className="uppercase tracking-wider" />
                   <p className="text-[11px] text-muted-foreground">
-                    Required unless you're the first user. Ask an administrator to generate one.
+                    Required unless you're the first user. You'll re-confirm it in Settings to unlock the app.
                   </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create account"}
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">
-                  First user becomes administrator automatically.
+                  First user becomes CEO automatically.
                 </p>
               </form>
             </TabsContent>

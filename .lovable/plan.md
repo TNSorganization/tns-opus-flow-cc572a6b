@@ -1,85 +1,102 @@
-# Match the Prototype: Full TOS v2
 
-Adopts the uploaded prototype's look and structure, then wires real backend for every page. Keeps existing Attendance/Tasks/Finance data but reshapes UI, splits pages, and adds three new modules.
+# TNS Platform Overhaul
 
-## Visual System (prototype-faithful)
+This is a large change — grouped into one migration + a coordinated frontend pass so nothing ships half-built.
 
-- Indigo→purple gradients on primary actions, avatars, logo tile.
-- Card style: soft rounded (16px), 1px translucent border, hover lift + shadow.
-- Colored icon tiles per KPI (green/red/blue/purple/orange/teal/pink/yellow).
-- Staff cards with colored 3px top-border by status (present/break/absent/off).
-- Sidebar sections: Overview · Workforce · Finance · Knowledge.
-- Theme toggle: dark (default) + light, persisted in localStorage.
-- Global search box in top bar (staff / tasks / transactions).
-- Toast pattern via existing sonner.
-- Keep Geist typography.
+## 1. Roles & permissions
 
-## Navigation restructure
+New `app_role` values: `ceo`, `programs_officer`. Keep `administrator`, `operations_manager`, `finance_officer`, `department_head`, `staff`. The first user to sign up becomes `ceo` (not administrator).
 
-Split current pages and add new ones:
+Helper SQL functions:
+- `is_ceo(uid)` — CEO only, can do everything.
+- `is_admin_or_ceo(uid)` — administrator or CEO (view-all + some actions).
+- `is_ops(uid)` — operations_manager or CEO.
+- `is_finance(uid)` — finance_officer or CEO.
+- `can_request_funds(uid)` — dept_head, administrator, ops, ceo.
+- `can_send_notifications(uid)` — programs_officer, ops, ceo.
+- `is_active(uid)` — has a redeemed, non-revoked matricule OR is ceo/ops (gate exemption).
 
-```
-/dashboard        Executive overview (dual-currency, Who's In, Pending Tasks)
-/attendance      Self actions + Today grid + Weekly chart
-/board           Live status board (keep)
-/tasks           Productivity + KPIs + filters
-/performance     Rankings, breakdown table, ring scores (NEW)
-/income          Split from finance (NEW page)
-/expenses        Split from finance + Pending approvals (NEW page)
-/reports         Daily/Weekly/Monthly/Annual cards + summary chart
-/documents       File library w/ folder tree (NEW)
-/sops            SOPs + Policies (NEW)
-/settings        Keep
-```
+## 2. Matricule: signup + re-confirm + revoke
 
-## Backend changes (one migration)
+- Signup still requires a matricule (as today).
+- New column `matricules.revoked_at`. When CEO fires a user or revokes their matricule, `is_active(uid)` returns false → app locks to Settings only.
+- New concept **matricule confirmation**: after signup, user must go to Settings → "Confirm my matricule" and re-enter the code once. Sets `matricules.confirmed_at`. Until then, `is_active()` is false. Once confirmed, it can never be re-confirmed.
+- If a user is fired: matricule is revoked, all their data access zeros out via RLS + client-side gate. CEO can issue a new matricule; user re-confirms to unlock.
+- CEO and operations_manager are always active (never gated).
 
-New / altered tables:
+Frontend: `AppShell` reads `is_active` — if false, sidebar shows only "Settings"; every other route redirects to `/settings` with a "Confirm your matricule" panel.
 
-- `income_entries` + `expense_entries`: add `currency TEXT NOT NULL DEFAULT 'XCFA'` (CHECK in {'XCFA','USD'}).
-- `documents` — id, folder, name, description, file_path (storage), mime, size, uploaded_by, timestamps. RLS: authenticated read/insert; delete by uploader or admin.
-- `document_folders` — seeded: Contracts, Meeting Minutes, Receipts, Staff Files, Organization.
-- `sops` — id, kind ('sop'|'policy'), title, content (markdown), version, status ('draft'|'active'|'archived'), owner_id, timestamps. RLS: authenticated read; managers write.
-- Storage bucket `documents` (private) with policies mirroring receipts bucket.
-- Performance view: SQL view `staff_performance_v` combining attendance %, task completion %, deadline accuracy over trailing 30 days, per user — read directly by /performance page.
+## 3. 6-digit numeric PIN
 
-Existing tables untouched otherwise. GRANTs + RLS included for every new table.
+Signup + reset forms accept only 6 digits (numeric input, `pattern="\d{6}"`, maxLength 6). Stored via Supabase Auth normally (6 chars satisfies Supabase's min).
 
-## Page-by-page implementation
+## 4. Live board visibility fix
 
-**Dashboard** — 4 KPI cards (Staff Present, Tasks Completed, Cash XCFA, Cash USD), two doughnut charts (attendance status, task completion), "Who's In" staff grid (live from `attendance_events`), "Pending Tasks" list.
+Current `attendance_events` SELECT policy likely restricts to `user_id = auth.uid()`. Change to: any authenticated + active user can SELECT all attendance rows (needed to see the org's live status). Insert stays self-only.
 
-**Attendance** — Existing 4 buttons + staff grid + Recharts weekly bar chart from `attendance_events`.
+## 5. Finance & expenses
 
-**Tasks** — Existing kanban replaced with the prototype's task-list rows: checkbox, title, meta (assignee, department, deadline, priority tag). Filter tabs (All/Pending/Progress/Overdue/Completed).
+- `income_entries` DELETE policy → finance_officer + CEO only.
+- Expenses "Request funds" button visible to `can_request_funds` roles → inserts row with `status='pending'`, `kind='fund_request'` (new column). Only finance/CEO can `approve`/`reject`/`delete`.
+- Approvals list highlights pending fund requests.
 
-**Performance** — Reads `staff_performance_v`. Top / bottom performer cards, horizontal bar chart of scores, breakdown table with per-metric ring scores.
+## 6. Private salary box
 
-**Income** — KPIs (today/week/month, top source), Recharts (source doughnut, 14-day line), transactions table, currency toggle filters by `currency`.
+New table `salary_ledger` (user_id, amount, currency, period, paid_at, note). RLS: SELECT for owner + finance + ceo; INSERT/UPDATE/DELETE for finance + ceo only. Salary amount set by CEO/finance.
 
-**Expenses** — KPIs, dept doughnut, cash-flow line (income vs expense), pending approvals table with Approve/Reject buttons (managers only, updates `status`).
+Payday flow: finance clicks "Mark payroll paid" → inserts a `salary_ledger` row per active staff + creates one personal notification per user ("Your salary of X was paid"). Notification auto-hides after 24 h (client-side filter `created_at > now() - 24h` for the payday type, or a `hide_after` column).
 
-**Reports** — Four period cards → open a summary sheet, existing CSV export kept, Recharts monthly summary bars.
+New page: `/salary` (self view of own current balance/last payment). Finance sees the full ledger and a "Run payroll" action.
 
-**Documents** — Folder tree left, doc grid right; upload → Supabase Storage (`documents` bucket) + row in `documents`. Click to download signed URL.
+## 7. Attendance & schedules
 
-**SOPs** — Two sections (SOPs / Policies) as list rows. Create/edit modal with markdown textarea; render with simple `react-markdown`.
+New table `work_schedules` (user_id, weekday 0–6, is_working_day bool). Ops sets who works which days. Default: Mon–Fri working.
+
+New table `absence_excuses` (user_id, date, reason, granted_by). Only ops can insert/delete.
+
+Live board and performance derive absence from:
+`is_working_day AND no check_in for date AND no excuse` → flagged red. Ops has an "Excuse" button per row.
+
+## 8. Notifications
+
+- `notifications` INSERT policy: `can_send_notifications`.
+- New notification composer for programs_officer/ops/ceo (target: everyone, a role, or a specific user).
+- Bell in header shows unread count; auto-invalidate via realtime.
+
+## 9. Profile customization
+
+`/profile` page (accessible to any authenticated + active user):
+- Edit full name, avatar (upload to `avatars` bucket).
+- Change password (6-digit PIN).
+- Read-only: email, role, department.
+
+## 10. Performance fix
+
+Actual root cause: current query counts only `status='completed'`, but new flow ends at `submitted → validated`. Also denominators are wrong.
+
+Rewrite metric to:
+- **Attendance score** = present days / (working days per schedule − excused).
+- **Task score** = validated tasks / assigned tasks (window: last 30 days).
+- **Punctuality** = on-time check-ins / present days.
+- Composite ranking with sensible weights (40/40/20).
+
+## 11. Departments seed
+
+Seed `departments`: Administration, Finance, Operations, Programs, Systems & Tech, Marketing. Profiles get a `department_id` FK + `job_title` text (already present or added). Settings gets a "Team roster" grid where CEO assigns department + title per user.
+
+---
 
 ## Technical notes
 
-- Currency toggle stored per-page in local state; DB column drives filter.
-- All new queries via `supabase` client + TanStack Query.
-- Recharts already in stack; add `react-markdown` for SOPs.
-- Performance view uses `SECURITY INVOKER` so RLS on underlying tables applies.
-- Global search: client-side across cached queries for v1.
+- One migration file with all schema + policy changes, ordered so grants/policies exist before frontend hits them.
+- Realtime publications extended to: `matricules`, `salary_ledger`, `absence_excuses`, `work_schedules`, `notifications`.
+- Existing `administrator` users are preserved; user (you) manually promotes self to `ceo` via a seed statement in the migration (the sole existing admin).
+- Client gate lives in `app-shell.tsx` reading a `useIsActive()` hook (queries `is_active` RPC).
+- Files touched: ~15 route/component files + 1 migration + 2 new hooks + 2 new pages (`/profile`, `/salary`) + `types.ts` regeneration.
 
-## Order
+## Out of scope for this turn
 
-1. Migration (currency + documents + sops + performance view + bucket).
-2. Restyle tokens (styles.css) + app-shell (sidebar sections, top bar search, theme toggle).
-3. Split finance → income.tsx + expenses.tsx (+ approval action).
-4. Restyle dashboard, attendance, tasks pages to prototype cards/lists.
-5. New pages: performance, documents, sops.
-6. Reports page tweaks.
+- Logistics module (inventory, POs, equipment, missions) — still pending from earlier; will follow after this lands.
+- Email delivery of matricules (still manual copy/paste).
 
-Ships as one large change set. Existing data preserved.
+Confirm and I'll ship it.

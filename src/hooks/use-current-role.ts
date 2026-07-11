@@ -4,6 +4,20 @@ import type { Database } from "@/integrations/supabase/types";
 
 export type Role = Database["public"]["Enums"]["app_role"];
 
+export const ALL_ROLES: Role[] = [
+  "ceo",
+  "administrator",
+  "operations_manager",
+  "finance_officer",
+  "programs_officer",
+  "department_head",
+  "staff",
+];
+
+export function roleLabel(r: Role) {
+  return r === "ceo" ? "CEO" : r.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function useCurrentRoles() {
   return useQuery({
     queryKey: ["current-user-roles"],
@@ -23,11 +37,33 @@ export function useCurrentRoles() {
   });
 }
 
+/** Whether current user is "active" (has a confirmed, non-revoked matricule
+ *  OR is CEO / operations_manager — those two are always active). */
+export function useIsActive() {
+  return useQuery({
+    queryKey: ["is-active"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return false;
+      const { data, error } = await supabase.rpc("is_active", { _uid: u.user.id });
+      if (error) return false;
+      return !!data;
+    },
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  });
+}
+
 export function hasAny(roles: Role[], ...check: Role[]) {
   return roles.some((r) => check.includes(r));
 }
 
-export const isAdmin = (r: Role[]) => hasAny(r, "administrator");
-export const isOps = (r: Role[]) => hasAny(r, "administrator", "operations_manager");
-export const isFinance = (r: Role[]) => hasAny(r, "administrator", "finance_officer");
-export const isDeptHead = (r: Role[]) => hasAny(r, "administrator", "department_head");
+export const isCeo = (r: Role[]) => hasAny(r, "ceo");
+export const isAdmin = (r: Role[]) => hasAny(r, "ceo", "administrator");
+export const isOps = (r: Role[]) => hasAny(r, "ceo", "operations_manager");
+export const isFinance = (r: Role[]) => hasAny(r, "ceo", "administrator", "finance_officer");
+export const isDeptHead = (r: Role[]) => hasAny(r, "ceo", "administrator", "department_head");
+export const canRequestFunds = (r: Role[]) =>
+  hasAny(r, "ceo", "administrator", "operations_manager", "department_head");
+export const canSendNotifications = (r: Role[]) =>
+  hasAny(r, "ceo", "operations_manager", "programs_officer");

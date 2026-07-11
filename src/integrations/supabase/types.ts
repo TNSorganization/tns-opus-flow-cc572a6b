@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      absence_excuses: {
+        Row: {
+          created_at: string
+          excuse_date: string
+          granted_by: string | null
+          id: string
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          excuse_date: string
+          granted_by?: string | null
+          id?: string
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          excuse_date?: string
+          granted_by?: string | null
+          id?: string
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       attendance_events: {
         Row: {
           created_at: string
@@ -392,6 +419,7 @@ export type Database = {
       matricules: {
         Row: {
           code: string
+          confirmed_at: string | null
           created_at: string
           created_by: string | null
           email: string | null
@@ -399,6 +427,8 @@ export type Database = {
           full_name: string | null
           id: string
           note: string | null
+          revoked_at: string | null
+          revoked_by: string | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
           used_at: string | null
@@ -406,6 +436,7 @@ export type Database = {
         }
         Insert: {
           code: string
+          confirmed_at?: string | null
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -413,6 +444,8 @@ export type Database = {
           full_name?: string | null
           id?: string
           note?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at?: string
           used_at?: string | null
@@ -420,6 +453,7 @@ export type Database = {
         }
         Update: {
           code?: string
+          confirmed_at?: string | null
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -427,6 +461,8 @@ export type Database = {
           full_name?: string | null
           id?: string
           note?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
           used_at?: string | null
@@ -437,31 +473,40 @@ export type Database = {
       notifications: {
         Row: {
           body: string | null
+          category: string
           created_at: string
+          hide_after: string | null
           id: string
           kind: string
           link: string | null
           read_at: string | null
+          sent_by: string | null
           title: string
           user_id: string
         }
         Insert: {
           body?: string | null
+          category?: string
           created_at?: string
+          hide_after?: string | null
           id?: string
           kind: string
           link?: string | null
           read_at?: string | null
+          sent_by?: string | null
           title: string
           user_id: string
         }
         Update: {
           body?: string | null
+          category?: string
           created_at?: string
+          hide_after?: string | null
           id?: string
           kind?: string
           link?: string | null
           read_at?: string | null
+          sent_by?: string | null
           title?: string
           user_id?: string
         }
@@ -496,6 +541,7 @@ export type Database = {
           email: string | null
           full_name: string
           id: string
+          job_title: string | null
           updated_at: string
           work_end_time: string
           work_start_time: string
@@ -507,6 +553,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id: string
+          job_title?: string | null
           updated_at?: string
           work_end_time?: string
           work_start_time?: string
@@ -518,6 +565,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          job_title?: string | null
           updated_at?: string
           work_end_time?: string
           work_start_time?: string
@@ -531,6 +579,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      salaries: {
+        Row: {
+          amount: number
+          currency: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          currency?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          currency?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      salary_payments: {
+        Row: {
+          amount: number
+          created_by: string | null
+          currency: string
+          id: string
+          note: string | null
+          paid_at: string
+          period: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_by?: string | null
+          currency?: string
+          id?: string
+          note?: string | null
+          paid_at?: string
+          period: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_by?: string | null
+          currency?: string
+          id?: string
+          note?: string | null
+          paid_at?: string
+          period?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       sops: {
         Row: {
@@ -715,12 +820,54 @@ export type Database = {
         }
         Relationships: []
       }
+      work_schedules: {
+        Row: {
+          friday: boolean
+          monday: boolean
+          saturday: boolean
+          sunday: boolean
+          thursday: boolean
+          tuesday: boolean
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+          wednesday: boolean
+        }
+        Insert: {
+          friday?: boolean
+          monday?: boolean
+          saturday?: boolean
+          sunday?: boolean
+          thursday?: boolean
+          tuesday?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+          wednesday?: boolean
+        }
+        Update: {
+          friday?: boolean
+          monday?: boolean
+          saturday?: boolean
+          sunday?: boolean
+          thursday?: boolean
+          tuesday?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+          wednesday?: boolean
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       admin_delete_user: { Args: { _user_id: string }; Returns: undefined }
+      can_request_funds: { Args: { _uid: string }; Returns: boolean }
+      can_send_notifications: { Args: { _uid: string }; Returns: boolean }
+      confirm_matricule: { Args: { _code: string }; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -728,11 +875,35 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_active: { Args: { _uid: string }; Returns: boolean }
+      is_ceo: { Args: { _uid: string }; Returns: boolean }
       is_finance: { Args: { _user_id: string }; Returns: boolean }
       is_manager: { Args: { _user_id: string }; Returns: boolean }
+      is_ops: { Args: { _uid: string }; Returns: boolean }
       redeem_matricule: {
         Args: { _code: string }
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      revoke_matricule: { Args: { _user_id: string }; Returns: undefined }
+      run_payroll: {
+        Args: { _note?: string; _period: string }
+        Returns: number
+      }
+      send_notification: {
+        Args: {
+          _body: string
+          _category?: string
+          _hide_after?: string
+          _target: string
+          _target_role?: Database["public"]["Enums"]["app_role"]
+          _target_user?: string
+          _title: string
+        }
+        Returns: number
+      }
+      set_salary: {
+        Args: { _amount: number; _currency: string; _user: string }
+        Returns: undefined
       }
     }
     Enums: {
@@ -742,6 +913,8 @@ export type Database = {
         | "finance_officer"
         | "department_head"
         | "staff"
+        | "ceo"
+        | "programs_officer"
       attendance_event_type:
         | "check_in"
         | "break_start"
@@ -890,6 +1063,8 @@ export const Constants = {
         "finance_officer",
         "department_head",
         "staff",
+        "ceo",
+        "programs_officer",
       ],
       attendance_event_type: [
         "check_in",
