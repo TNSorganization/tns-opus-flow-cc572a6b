@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +10,11 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { getAppUrl } from "@/lib/app-url";
+import {
+  clearPendingMatricule,
+  normalizeMatriculeCode,
+  savePendingMatricule,
+} from "@/lib/pending-matricule";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -20,10 +24,28 @@ export const Route = createFileRoute("/auth")({
 // 6-digit numeric password used across signup / signin / reset.
 const PIN_RE = /^\d{6}$/;
 
+function authErrorMessage(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("invalid login credentials")) return "Email or PIN is incorrect.";
+  if (normalized.includes("email not confirmed")) {
+    return "Confirm your email before signing in. Check your inbox for the confirmation link.";
+  }
+  if (normalized.includes("user already registered")) {
+    return "An account already exists for this email. Sign in or use Forgot PIN.";
+  }
+  if (normalized.includes("rate limit")) {
+    return "Too many attempts. Wait a few minutes, then try again.";
+  }
+
+  return message;
+}
+
 function AuthPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -48,14 +70,15 @@ function AuthPage() {
     const form = new FormData(e.currentTarget);
     const password = String(form.get("password"));
     if (!PIN_RE.test(password)) return toast.error("PIN must be 6 digits");
+    const email = String(form.get("email")).trim().toLowerCase();
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({
-      email: String(form.get("email")),
+      email,
       password,
     });
     if (error) {
       setLoading(false);
-      return toast.error(error.message);
+      return toast.error(authErrorMessage(error.message));
     }
     setLoading(false);
     navigate({ to: "/home", replace: true });
@@ -64,11 +87,12 @@ function AuthPage() {
   async function signUpEmail(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    const matricule = String(form.get("matricule") ?? "").trim();
-    const email = String(form.get("email"));
+    const matricule = normalizeMatriculeCode(String(form.get("matricule") ?? ""));
+    const email = String(form.get("email")).trim().toLowerCase();
     const password = String(form.get("password"));
-    const fullName = String(form.get("full_name") ?? "");
+    const fullName = String(form.get("full_name") ?? "").trim();
     if (!PIN_RE.test(password)) return toast.error("PIN must be 6 digits");
+    setConfirmationEmail(null);
     setLoading(true);
 
     if (matricule) {
@@ -77,10 +101,17 @@ function AuthPage() {
         .select("id, used_by, expires_at")
         .eq("code", matricule)
         .maybeSingle();
-      if (mErr || !m || m.used_by || (m.expires_at && new Date(m.expires_at) < new Date())) {
+      if (mErr) {
+        setLoading(false);
+        return toast.error(
+          "We couldn't verify the matricule. Check your connection and try again.",
+        );
+      }
+      if (!m || m.used_by || (m.expires_at && new Date(m.expires_at) < new Date())) {
         setLoading(false);
         return toast.error("Invalid or already-used matricule");
       }
+      savePendingMatricule(matricule, email);
     }
 
     const { data: signUpData, error } = await supabase.auth.signUp({
@@ -92,45 +123,25 @@ function AuthPage() {
       },
     });
     if (error) {
+      clearPendingMatricule(matricule || undefined);
       setLoading(false);
-      return toast.error(error.message);
+      return toast.error(authErrorMessage(error.message));
     }
 
-    if (matricule && signUpData.session) {
-      const { error: rErr } = await supabase.rpc("redeem_matricule", { _code: matricule });
-      if (rErr) {
-        setLoading(false);
-        return toast.error(`Signup ok but matricule failed: ${rErr.message}`);
-      }
-    } else if (matricule) {
-      try {
-        localStorage.setItem("pending_matricule", matricule);
-      } catch {
-        /* ignore */
-      }
+    if (signUpData.user?.identities?.length === 0) {
+      clearPendingMatricule(matricule || undefined);
+      setLoading(false);
+      return toast.error("An account already exists for this email. Sign in or use Forgot PIN.");
     }
 
     setLoading(false);
     if (signUpData.session) {
-      toast.success("Welcome! Now confirm your matricule in Settings to unlock the app.");
+      toast.success("Account created. Activate your matricule to finish setup.");
       navigate({ to: "/home", replace: true });
     } else {
+      setConfirmationEmail(email);
       toast.success("Account created. Check your inbox to confirm your email.");
     }
-  }
-
-  async function google() {
-    setLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: getAppUrl(),
-    });
-    if (result.error) {
-      setLoading(false);
-      toast.error(result.error.message ?? "Google sign-in failed");
-      return;
-    }
-    if (result.redirected) return;
-    navigate({ to: "/home", replace: true });
   }
 
   if (checking) {
@@ -158,27 +169,18 @@ function AuthPage() {
         </div>
 
         <Card className="surface p-6">
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={google}
-            disabled={loading}
-            type="button"
-          >
-            <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-              <path
-                fill="currentColor"
-                d="M21.35 11.1H12v3.2h5.35c-.23 1.5-1.68 4.4-5.35 4.4-3.22 0-5.85-2.67-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.57-2.47C16.83 4.34 14.66 3.5 12 3.5 7.03 3.5 3 7.53 3 12.5s4.03 9 9 9c5.2 0 8.63-3.65 8.63-8.78 0-.6-.06-1.05-.13-1.62z"
-              />
-            </svg>
-            Continue with Google
-          </Button>
-
-          <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-            <div className="h-px flex-1 bg-border" />
-            or
-            <div className="h-px flex-1 bg-border" />
-          </div>
+          {confirmationEmail && (
+            <div
+              className="mb-5 rounded-lg border border-brand-success/40 bg-brand-success/5 p-3 text-sm"
+              role="status"
+            >
+              <p className="font-medium">Confirmation email sent</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Open the link sent to {confirmationEmail}. After confirmation, we'll bring you back
+                to activate your matricule.
+              </p>
+            </div>
+          )}
 
           <Tabs defaultValue="signin">
             <TabsList className="grid w-full grid-cols-2">
@@ -254,11 +256,14 @@ function AuthPage() {
                     type="text"
                     placeholder="Code from the CEO"
                     autoComplete="off"
+                    onChange={(event) => {
+                      event.currentTarget.value = event.currentTarget.value.toUpperCase();
+                    }}
                     className="uppercase tracking-wider"
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    Required unless you're the first user. You'll re-confirm it in Settings to
-                    unlock the app.
+                    Required unless you're the first user. We'll carry it through email confirmation
+                    and prefill the activation step.
                   </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
@@ -271,6 +276,9 @@ function AuthPage() {
             </TabsContent>
           </Tabs>
         </Card>
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          Google sign-in is temporarily unavailable. Use your email and 6-digit PIN.
+        </p>
       </div>
     </div>
   );

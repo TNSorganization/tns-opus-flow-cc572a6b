@@ -40,6 +40,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { format } from "date-fns";
+import {
+  clearPendingMatricule,
+  getPendingMatricule,
+  normalizeMatriculeCode,
+} from "@/lib/pending-matricule";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -163,7 +168,7 @@ function SettingsPage() {
 // ============ Matricule Confirmation (for everyone once) ============
 function MatriculeConfirm({ userId }: { userId: string | null }) {
   const qc = useQueryClient();
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(() => getPendingMatricule()?.code ?? "");
   const [loading, setLoading] = useState(false);
   const { data: myMat } = useQuery({
     queryKey: ["my-matricule", userId],
@@ -179,13 +184,36 @@ function MatriculeConfirm({ userId }: { userId: string | null }) {
   });
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    const normalizedCode = normalizeMatriculeCode(code);
     setLoading(true);
-    const { error } = await supabase.rpc("confirm_matricule", { _code: code.trim() });
+
+    // A confirmed-email signup has not yet had an authenticated session in which
+    // to attach its matricule. Redeeming first also keeps older signups working.
+    const { error: redeemError } = await supabase.rpc("redeem_matricule", {
+      _code: normalizedCode,
+    });
+    const { error: confirmError } = await supabase.rpc("confirm_matricule", {
+      _code: normalizedCode,
+    });
     setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("Matricule confirmed — you're now unlocked");
+
+    const alreadyConfirmed = confirmError?.message.toLowerCase().includes("already confirmed");
+    if (confirmError && !alreadyConfirmed) {
+      const redeemFailedUnexpectedly =
+        redeemError && !redeemError.message.toLowerCase().includes("already-used");
+      return toast.error(
+        redeemFailedUnexpectedly
+          ? `Could not activate this matricule: ${redeemError.message}`
+          : "This matricule is invalid, expired, revoked, or belongs to another account.",
+      );
+    }
+
+    clearPendingMatricule(normalizedCode);
+    setCode("");
+    toast.success("Matricule activated. Your account is ready.");
     qc.invalidateQueries({ queryKey: ["is-active"] });
     qc.invalidateQueries({ queryKey: ["my-matricule"] });
+    qc.invalidateQueries({ queryKey: ["current-user-roles"] });
   }
 
   const revoked = myMat?.revoked_at;
@@ -198,7 +226,7 @@ function MatriculeConfirm({ userId }: { userId: string | null }) {
           <p className="text-sm text-muted-foreground">
             {revoked
               ? "Your matricule has been revoked. Ask the CEO to issue you a new one, then confirm it below."
-              : "Enter the code the CEO gave you. Once confirmed, it can never be re-confirmed."}
+              : "Enter the code the CEO gave you once to activate your account."}
           </p>
         </div>
       </div>
@@ -207,14 +235,14 @@ function MatriculeConfirm({ userId }: { userId: string | null }) {
           <Label>Matricule code</Label>
           <Input
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
             placeholder="TNS-XXXXX-XXXXX"
             className="uppercase tracking-wider font-mono"
             required
           />
         </div>
         <Button type="submit" disabled={loading || !code.trim()}>
-          <KeyRound className="mr-1 h-4 w-4" /> Confirm
+          <KeyRound className="mr-1 h-4 w-4" /> {loading ? "Activating..." : "Activate account"}
         </Button>
       </form>
     </div>
@@ -350,8 +378,8 @@ function MatriculesSettings() {
         <div className="p-4">
           <h3 className="text-sm font-semibold">All matricules</h3>
           <p className="text-xs text-muted-foreground">
-            Send the code to the recruit. They sign up with it, then confirm it in Settings to
-            unlock the app.
+            Send the code to the recruit. The app carries it through signup and prompts them to
+            activate their account after email confirmation.
           </p>
         </div>
         <div className="divide-y divide-border border-t border-border">
