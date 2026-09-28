@@ -7,6 +7,9 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Bun is the canonical package manager for this project.
+package-lock.json
+
 node_modules
 dist
 dist-ssr

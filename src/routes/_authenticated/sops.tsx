@@ -7,9 +7,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus, Loader2, BookOpen, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -22,7 +33,9 @@ export const Route = createFileRoute("/_authenticated/sops")({
 function SopsPage() {
   const { data: items = [] } = useQuery({
     queryKey: ["sops"],
-    queryFn: async () => (await supabase.from("sops").select("*").order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () =>
+      (await supabase.from("sops").select("*").order("created_at", { ascending: false })).data ??
+      [],
   });
 
   const sops = items.filter((i) => i.kind === "sop");
@@ -30,32 +43,66 @@ function SopsPage() {
 
   return (
     <div className="space-y-6">
-      <div><NewButton /></div>
+      <div>
+        <NewButton />
+      </div>
 
       <div>
         <SectionHeader title="Standard Operating Procedures" />
-        <List items={sops} icon={<BookOpen className="h-5 w-5" />} tone="primary" empty="No SOPs yet." />
+        <List
+          items={sops}
+          icon={<BookOpen className="h-5 w-5" />}
+          tone="primary"
+          empty="No SOPs yet."
+        />
       </div>
       <div>
         <SectionHeader title="Policies" />
-        <List items={policies} icon={<ShieldCheck className="h-5 w-5" />} tone="purple" empty="No policies yet." />
+        <List
+          items={policies}
+          icon={<ShieldCheck className="h-5 w-5" />}
+          tone="purple"
+          empty="No policies yet."
+        />
       </div>
     </div>
   );
 }
 
-type Sop = { id: string; title: string; version: string; status: string; content: string; updated_at: string };
+type Sop = {
+  id: string;
+  title: string;
+  version: string;
+  status: string;
+  content: string;
+  updated_at: string;
+};
 
-function List({ items, icon, tone, empty }: { items: Sop[]; icon: React.ReactNode; tone: "primary" | "purple"; empty: string }) {
+function List({
+  items,
+  icon,
+  tone,
+  empty,
+}: {
+  items: Sop[];
+  icon: React.ReactNode;
+  tone: "primary" | "purple";
+  empty: string;
+}) {
   const [open, setOpen] = useState<Sop | null>(null);
-  if (items.length === 0) return <div className="tos-card p-8 text-center text-sm text-muted-foreground">{empty}</div>;
-  const toneCls = tone === "primary" ? "bg-primary/15 text-primary" : "bg-brand-purple/15 text-brand-purple";
+  if (items.length === 0)
+    return <div className="tos-card p-8 text-center text-sm text-muted-foreground">{empty}</div>;
+  const toneCls =
+    tone === "primary" ? "bg-primary/15 text-primary" : "bg-brand-purple/15 text-brand-purple";
   return (
     <>
       <div className="space-y-2">
         {items.map((s) => (
-          <button key={s.id} onClick={() => setOpen(s)}
-            className="tos-card flex w-full items-start gap-4 text-left hover:border-primary/50">
+          <button
+            key={s.id}
+            onClick={() => setOpen(s)}
+            className="tos-card flex w-full items-start gap-4 text-left hover:border-primary/50"
+          >
             <div className={"icon-tile " + toneCls}>{icon}</div>
             <div className="min-w-0 flex-1">
               <div className="mb-1 font-semibold">{s.title}</div>
@@ -70,7 +117,9 @@ function List({ items, icon, tone, empty }: { items: Sop[]; icon: React.ReactNod
       </div>
       <Dialog open={!!open} onOpenChange={(v) => !v && setOpen(null)}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>{open?.title}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{open?.title}</DialogTitle>
+          </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground">
             {open?.content || "(empty)"}
           </div>
@@ -106,16 +155,22 @@ function NewButton() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gradient-brand text-white"><Plus className="mr-1.5 h-4 w-4" /> New SOP / Policy</Button>
+        <Button className="gradient-brand text-white">
+          <Plus className="mr-1.5 h-4 w-4" /> New SOP / Policy
+        </Button>
       </DialogTrigger>
       <DialogContent className="max-w-xl">
-        <DialogHeader><DialogTitle>New SOP / Policy</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>New SOP / Policy</DialogTitle>
+        </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Kind</Label>
               <Select name="kind" defaultValue="sop">
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sop">SOP</SelectItem>
                   <SelectItem value="policy">Policy</SelectItem>

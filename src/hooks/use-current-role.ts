@@ -24,10 +24,7 @@ export function useCurrentRoles() {
     queryFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return { userId: null as string | null, roles: [] as Role[] };
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", u.user.id);
+      const { data } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
       return {
         userId: u.user.id,
         roles: (data ?? []).map((r) => r.role as Role),

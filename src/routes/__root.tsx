@@ -19,7 +19,14 @@ import "@fontsource/geist-mono/500.css";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { supabase } from "@/integrations/supabase/client";
+import { getAssetUrl } from "@/lib/app-url";
+
+const publicAppUrl = import.meta.env.VITE_PUBLIC_APP_URL?.replace(/\/$/, "");
+const shareImage = publicAppUrl
+  ? `${publicAppUrl}/social/tns-operations-share.png`
+  : getAssetUrl("social/tns-operations-share.png");
 
 function NotFoundComponent() {
   return (
@@ -69,12 +76,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           >
             Try again
           </button>
-          <a
-            href="/"
+          <Link
+            to="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
             Go home
-          </a>
+          </Link>
         </div>
       </div>
     </div>
@@ -93,6 +100,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "The operating system for TNS — attendance, tasks, finance, and executive dashboards in one place.",
       },
       { name: "theme-color", content: "#0f0f14" },
+      { name: "application-name", content: "TNS Opus" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "TNS Opus" },
       { property: "og:title", content: "TNS Operations System" },
       {
         property: "og:description",
@@ -102,13 +114,25 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "TNS Operations System" },
-      { name: "twitter:description", content: "The operating system for TNS — attendance, tasks, finance, and executive dashboards in one place." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/vGmb62dEDDNaLXfNVOpAgZQGnxm2/social-images/social-1783592880649-ID_Brand_Guide.webp" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/vGmb62dEDDNaLXfNVOpAgZQGnxm2/social-images/social-1783592880649-ID_Brand_Guide.webp" },
+      {
+        name: "twitter:description",
+        content:
+          "The operating system for TNS — attendance, tasks, finance, and executive dashboards in one place.",
+      },
+      {
+        property: "og:image",
+        content: shareImage,
+      },
+      {
+        name: "twitter:image",
+        content: shareImage,
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.png", type: "image/png" },
+      { rel: "icon", href: getAssetUrl("favicon.png"), type: "image/png" },
+      { rel: "apple-touch-icon", href: getAssetUrl("icons/apple-touch-icon.png") },
+      { rel: "manifest", href: getAssetUrl("manifest.webmanifest") },
     ],
   }),
   shellComponent: RootShell,
@@ -144,10 +168,19 @@ function RootComponent() {
     return () => sub.subscription.unsubscribe();
   }, [router, queryClient]);
 
+  useEffect(() => {
+    if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
+
+    navigator.serviceWorker
+      .register(getAssetUrl("sw.js"), { scope: import.meta.env.BASE_URL })
+      .catch((error) => console.warn("Service worker registration failed", error));
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
       <Toaster />
+      <PwaInstallPrompt />
     </QueryClientProvider>
   );
 }

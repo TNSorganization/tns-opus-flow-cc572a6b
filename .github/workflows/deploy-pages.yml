@@ -1,0 +1,63 @@
+name: Deploy TNS Opus app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: tns-opus-pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Use Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify source
+        run: |
+          bun run lint
+          bun run typecheck
+
+      - name: Build GitHub Pages application
+        run: bun run build:pages
+        env:
+          VITE_PUBLIC_APP_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+
+      - name: Prepare SPA fallback
+        run: |
+          test -f dist/client/index.html
+          cp dist/client/index.html dist/client/404.html
+          touch dist/client/.nojekyll
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload application
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist/client
+
+      - name: Publish application
+        id: deployment
+        uses: actions/deploy-pages@v4

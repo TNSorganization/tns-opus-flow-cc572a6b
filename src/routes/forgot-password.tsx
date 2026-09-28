@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
+import { getAppUrl } from "@/lib/app-url";
 
 export const Route = createFileRoute("/forgot-password")({
   ssr: false,
@@ -21,7 +22,7 @@ function ForgotPasswordPage() {
     const form = new FormData(e.currentTarget);
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(String(form.get("email")), {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: getAppUrl("reset-password"),
     });
     setLoading(false);
     if (error) return toast.error(error.message);

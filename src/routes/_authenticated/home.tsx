@@ -37,10 +37,8 @@ function HomePage() {
   useEffect(() => {
     const ch = supabase
       .channel("attendance-self")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "attendance_events" },
-        () => qc.invalidateQueries({ queryKey: ["attendance-today"] }),
+      .on("postgres_changes", { event: "*", schema: "public", table: "attendance_events" }, () =>
+        qc.invalidateQueries({ queryKey: ["attendance-today"] }),
       )
       .subscribe();
     return () => {
@@ -88,15 +86,17 @@ function HomePage() {
   return (
     <div className="space-y-8">
       <header className="flex flex-col gap-1">
-        <p className="text-sm text-muted-foreground">
-          {format(today, "EEEE, d MMMM yyyy")}
-        </p>
+        <p className="text-sm text-muted-foreground">{format(today, "EEEE, d MMMM yyyy")}</p>
         <h1 className="text-3xl font-semibold tracking-tight">Today</h1>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-4">
         <StatCard label="Status" value={<StatusPill state={state.status} />} />
-        <StatCard label="Check-in" value={totals.checkIn ? format(totals.checkIn, "HH:mm") : "—"} mono />
+        <StatCard
+          label="Check-in"
+          value={totals.checkIn ? format(totals.checkIn, "HH:mm") : "—"}
+          mono
+        />
         <StatCard label="Productive" value={fmtDuration(totals.productiveMs)} mono />
         <StatCard label="Break" value={fmtDuration(totals.breakMs)} mono />
       </div>

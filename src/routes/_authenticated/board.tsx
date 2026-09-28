@@ -11,7 +11,12 @@ export const Route = createFileRoute("/_authenticated/board")({
   component: BoardPage,
 });
 
-type Row = { id: string; full_name: string | null; email: string | null; avatar_url: string | null };
+type Row = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+};
 
 function BoardPage() {
   const qc = useQueryClient();
@@ -25,7 +30,9 @@ function BoardPage() {
   const { data: profiles = [] } = useQuery({
     queryKey: ["all-profiles"],
     queryFn: async (): Promise<Row[]> => {
-      const { data, error } = await supabase.from("profiles").select("id, full_name, email, avatar_url");
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, avatar_url");
       if (error) throw error;
       return data ?? [];
     },
@@ -48,10 +55,8 @@ function BoardPage() {
   useEffect(() => {
     const ch = supabase
       .channel("attendance-board")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "attendance_events" },
-        () => qc.invalidateQueries({ queryKey: ["all-attendance-today"] }),
+      .on("postgres_changes", { event: "*", schema: "public", table: "attendance_events" }, () =>
+        qc.invalidateQueries({ queryKey: ["all-attendance-today"] }),
       )
       .subscribe();
     return () => {
@@ -66,7 +71,12 @@ function BoardPage() {
     byUser.set(e.user_id, arr);
   }
 
-  const grouped = { present: [] as Row[], on_break: [] as Row[], checked_out: [] as Row[], off: [] as Row[] };
+  const grouped = {
+    present: [] as Row[],
+    on_break: [] as Row[],
+    checked_out: [] as Row[],
+    off: [] as Row[],
+  };
   const sinceMap = new Map<string, Date | null>();
   for (const p of profiles) {
     const s = deriveStatus(byUser.get(p.id) ?? []);
@@ -75,10 +85,30 @@ function BoardPage() {
   }
 
   const buckets = [
-    { key: "present" as const, label: "Working", tone: "text-status-working", dot: "bg-status-working" },
-    { key: "on_break" as const, label: "On break", tone: "text-status-break", dot: "bg-status-break" },
-    { key: "checked_out" as const, label: "Signed out", tone: "text-status-off", dot: "bg-status-off" },
-    { key: "off" as const, label: "Not arrived", tone: "text-status-absent", dot: "bg-status-absent" },
+    {
+      key: "present" as const,
+      label: "Working",
+      tone: "text-status-working",
+      dot: "bg-status-working",
+    },
+    {
+      key: "on_break" as const,
+      label: "On break",
+      tone: "text-status-break",
+      dot: "bg-status-break",
+    },
+    {
+      key: "checked_out" as const,
+      label: "Signed out",
+      tone: "text-status-off",
+      dot: "bg-status-off",
+    },
+    {
+      key: "off" as const,
+      label: "Not arrived",
+      tone: "text-status-absent",
+      dot: "bg-status-absent",
+    },
   ];
 
   return (

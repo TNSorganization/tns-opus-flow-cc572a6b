@@ -12,7 +12,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import {
+  format,
+  startOfDay,
+  endOfDay,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+} from "date-fns";
 import { Download } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/reports")({
@@ -29,7 +37,11 @@ function ReportsPage() {
   const range = useMemo(() => {
     const now = new Date();
     if (preset === "today") return { from: startOfDay(now), to: endOfDay(now) };
-    if (preset === "week") return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
+    if (preset === "week")
+      return {
+        from: startOfWeek(now, { weekStartsOn: 1 }),
+        to: endOfWeek(now, { weekStartsOn: 1 }),
+      };
     if (preset === "month") return { from: startOfMonth(now), to: endOfMonth(now) };
     return { from: startOfDay(new Date(from)), to: endOfDay(new Date(to)) };
   }, [preset, from, to]);
@@ -89,7 +101,9 @@ function ReportsPage() {
       const s = v == null ? "" : String(v);
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const csv = [keys.join(","), ...rows.map((r) => keys.map((k) => escape(r[k])).join(","))].join("\n");
+    const csv = [keys.join(","), ...rows.map((r) => keys.map((k) => escape(r[k])).join(","))].join(
+      "\n",
+    );
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

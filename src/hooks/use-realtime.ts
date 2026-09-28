@@ -16,13 +16,9 @@ export function useRealtimeInvalidate(
   useEffect(() => {
     let ch = supabase.channel(channelName);
     for (const table of tables) {
-      ch = ch.on(
-        "postgres_changes",
-        { event: "*", schema: "public", table },
-        () => {
-          for (const key of queryKeys) qc.invalidateQueries({ queryKey: key });
-        },
-      );
+      ch = ch.on("postgres_changes", { event: "*", schema: "public", table }, () => {
+        for (const key of queryKeys) qc.invalidateQueries({ queryKey: key });
+      });
     }
     ch.subscribe();
     return () => {

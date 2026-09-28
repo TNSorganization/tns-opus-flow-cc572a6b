@@ -18,8 +18,11 @@ function SalaryPage() {
     queryKey: ["my-salary", me?.userId],
     enabled: !!me?.userId,
     queryFn: async () => {
-      const { data } = await supabase.from("salaries").select("amount, currency, updated_at")
-        .eq("user_id", me!.userId!).maybeSingle();
+      const { data } = await supabase
+        .from("salaries")
+        .select("amount, currency, updated_at")
+        .eq("user_id", me!.userId!)
+        .maybeSingle();
       return data;
     },
   });
@@ -27,23 +30,35 @@ function SalaryPage() {
   const { data: myPayments = [] } = useQuery({
     queryKey: ["my-salary-payments", me?.userId],
     enabled: !!me?.userId,
-    queryFn: async () => (await supabase.from("salary_payments")
-      .select("id, amount, currency, period, paid_at, note")
-      .eq("user_id", me!.userId!).order("paid_at", { ascending: false }).limit(24)).data ?? [],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("salary_payments")
+          .select("id, amount, currency, period, paid_at, note")
+          .eq("user_id", me!.userId!)
+          .order("paid_at", { ascending: false })
+          .limit(24)
+      ).data ?? [],
   });
 
   const { data: allPayments = [] } = useQuery({
     queryKey: ["all-salary-payments"],
     enabled: finance,
-    queryFn: async () => (await supabase.from("salary_payments")
-      .select("id, user_id, amount, currency, period, paid_at, note")
-      .order("paid_at", { ascending: false }).limit(200)).data ?? [],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("salary_payments")
+          .select("id, user_id, amount, currency, period, paid_at, note")
+          .order("paid_at", { ascending: false })
+          .limit(200)
+      ).data ?? [],
   });
 
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-min"],
     enabled: finance,
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
+    queryFn: async () =>
+      (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
   });
 
   return (
@@ -57,7 +72,9 @@ function SalaryPage() {
         <div className="flex items-center gap-3">
           <Wallet className="h-6 w-6 text-primary" />
           <div>
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">Current agreed salary</div>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+              Current agreed salary
+            </div>
             <div className="mt-1 text-3xl font-bold kpi-number">
               {mySalary && mySalary.amount > 0
                 ? formatMoneyFull(Number(mySalary.amount), mySalary.currency as "XCFA" | "USD")
@@ -73,29 +90,35 @@ function SalaryPage() {
       </div>
 
       <section>
-        <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Payment history</h2>
+        <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Payment history
+        </h2>
         <div className="surface divide-y divide-border">
           {myPayments.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">No payments yet.</div>
-          ) : myPayments.map((p) => (
-            <div key={p.id} className="flex items-center justify-between p-3">
-              <div>
-                <div className="text-sm font-medium">{p.period}</div>
-                <div className="text-xs text-muted-foreground">
-                  Paid {format(new Date(p.paid_at), "d MMM yyyy")} {p.note && `· ${p.note}`}
+          ) : (
+            myPayments.map((p) => (
+              <div key={p.id} className="flex items-center justify-between p-3">
+                <div>
+                  <div className="text-sm font-medium">{p.period}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Paid {format(new Date(p.paid_at), "d MMM yyyy")} {p.note && `· ${p.note}`}
+                  </div>
+                </div>
+                <div className="kpi-number text-sm font-semibold text-brand-success">
+                  +{formatMoneyFull(Number(p.amount), p.currency as "XCFA" | "USD")}
                 </div>
               </div>
-              <div className="kpi-number text-sm font-semibold text-brand-success">
-                +{formatMoneyFull(Number(p.amount), p.currency as "XCFA" | "USD")}
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </section>
 
       {finance && (
         <section>
-          <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">All payments (Finance view)</h2>
+          <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            All payments (Finance view)
+          </h2>
           <div className="surface overflow-x-auto p-0">
             <table className="w-full text-sm">
               <thead>

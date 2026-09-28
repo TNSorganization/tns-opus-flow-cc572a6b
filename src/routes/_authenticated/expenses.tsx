@@ -4,23 +4,55 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeInvalidate } from "@/hooks/use-realtime";
 import { Button } from "@/components/ui/button";
-import { useCurrentRoles, isFinance as isFin, canRequestFunds as canReq } from "@/hooks/use-current-role";
+import {
+  useCurrentRoles,
+  isFinance as isFin,
+  canRequestFunds as canReq,
+} from "@/hooks/use-current-role";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Plus, ArrowUp, Loader2, Calendar, CalendarDays, Building2, Check, X } from "lucide-react";
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
+import {
+  format,
+  startOfDay,
+  endOfDay,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  subDays,
+} from "date-fns";
 import { toast } from "sonner";
 import { KpiCard, SectionHeader } from "@/components/kpi-card";
 import { formatMoney, type Currency } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import {
-  ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
 } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/expenses")({
@@ -28,8 +60,14 @@ export const Route = createFileRoute("/_authenticated/expenses")({
 });
 
 const PIE_COLORS = [
-  "var(--brand-danger)", "var(--brand-orange)", "var(--brand-yellow)", "var(--brand-pink)",
-  "var(--brand-purple)", "var(--primary)", "var(--brand-teal)", "var(--brand-info)",
+  "var(--brand-danger)",
+  "var(--brand-orange)",
+  "var(--brand-yellow)",
+  "var(--brand-pink)",
+  "var(--brand-purple)",
+  "var(--primary)",
+  "var(--brand-teal)",
+  "var(--brand-info)",
 ];
 
 function ExpensesPage() {
@@ -52,7 +90,9 @@ function ExpensesPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("expense_entries")
-        .select("id, entry_date, amount, currency, purpose, category_id, department_id, status, payment_method_id, reference, created_by")
+        .select(
+          "id, entry_date, amount, currency, purpose, category_id, department_id, status, payment_method_id, reference, created_by",
+        )
         .eq("currency", currency)
         .order("entry_date", { ascending: false })
         .limit(500);
@@ -77,12 +117,14 @@ function ExpensesPage() {
   const { data: categories = [] } = useQuery({
     queryKey: ["expense-categories"],
     queryFn: async () =>
-      (await supabase.from("expense_categories").select("*").eq("active", true).order("name")).data ?? [],
+      (await supabase.from("expense_categories").select("*").eq("active", true).order("name"))
+        .data ?? [],
   });
   const { data: methods = [] } = useQuery({
     queryKey: ["payment-methods"],
     queryFn: async () =>
-      (await supabase.from("payment_methods").select("*").eq("active", true).order("name")).data ?? [],
+      (await supabase.from("payment_methods").select("*").eq("active", true).order("name")).data ??
+      [],
   });
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
@@ -90,17 +132,23 @@ function ExpensesPage() {
   });
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-min"],
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
+    queryFn: async () =>
+      (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
   });
 
   const sumRange = (from: Date, to: Date) =>
-    rows.filter((r) => {
-      const d = new Date(r.entry_date);
-      return d >= from && d <= to;
-    }).reduce((a, b) => a + Number(b.amount), 0);
+    rows
+      .filter((r) => {
+        const d = new Date(r.entry_date);
+        return d >= from && d <= to;
+      })
+      .reduce((a, b) => a + Number(b.amount), 0);
 
   const todayTotal = sumRange(startOfDay(today), endOfDay(today));
-  const weekTotal = sumRange(startOfWeek(today, { weekStartsOn: 1 }), endOfWeek(today, { weekStartsOn: 1 }));
+  const weekTotal = sumRange(
+    startOfWeek(today, { weekStartsOn: 1 }),
+    endOfWeek(today, { weekStartsOn: 1 }),
+  );
   const monthTotal = sumRange(startOfMonth(today), endOfMonth(today));
 
   const byDept = new Map<string, number>();
@@ -127,11 +175,14 @@ function ExpensesPage() {
   const approve = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
       const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("expense_entries").update({
-        status,
-        approved_by: u.user?.id,
-        approved_at: new Date().toISOString(),
-      }).eq("id", id);
+      const { error } = await supabase
+        .from("expense_entries")
+        .update({
+          status,
+          approved_by: u.user?.id,
+          approved_at: new Date().toISOString(),
+        })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_d, v) => {
@@ -166,9 +217,14 @@ function ExpensesPage() {
         )}
         <div className="inline-flex rounded-md border border-border bg-muted/40 p-1">
           {(["XCFA", "USD"] as Currency[]).map((c) => (
-            <button key={c} onClick={() => setCurrency(c)}
-              className={"rounded px-3 py-1 text-xs font-bold transition-colors " +
-                (currency === c ? "bg-card text-foreground shadow" : "text-muted-foreground")}>
+            <button
+              key={c}
+              onClick={() => setCurrency(c)}
+              className={
+                "rounded px-3 py-1 text-xs font-bold transition-colors " +
+                (currency === c ? "bg-card text-foreground shadow" : "text-muted-foreground")
+              }
+            >
               {c}
             </button>
           ))}
@@ -176,28 +232,60 @@ function ExpensesPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard tone="danger" icon={<ArrowUp className="h-5 w-5" />}
-          value={formatMoney(todayTotal, currency)} label="Today's Expenses" />
-        <KpiCard tone="orange" icon={<Calendar className="h-5 w-5" />}
-          value={formatMoney(weekTotal, currency)} label="This Week" />
-        <KpiCard tone="yellow" icon={<CalendarDays className="h-5 w-5" />}
-          value={formatMoney(monthTotal, currency)} label="This Month" />
-        <KpiCard tone="pink" icon={<Building2 className="h-5 w-5" />}
-          value={<span className="text-xl">{topDept}</span>} label="Highest Spending Dept" />
+        <KpiCard
+          tone="danger"
+          icon={<ArrowUp className="h-5 w-5" />}
+          value={formatMoney(todayTotal, currency)}
+          label="Today's Expenses"
+        />
+        <KpiCard
+          tone="orange"
+          icon={<Calendar className="h-5 w-5" />}
+          value={formatMoney(weekTotal, currency)}
+          label="This Week"
+        />
+        <KpiCard
+          tone="yellow"
+          icon={<CalendarDays className="h-5 w-5" />}
+          value={formatMoney(monthTotal, currency)}
+          label="This Month"
+        />
+        <KpiCard
+          tone="pink"
+          icon={<Building2 className="h-5 w-5" />}
+          value={<span className="text-xl">{topDept}</span>}
+          label="Highest Spending Dept"
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="tos-card">
           <h3 className="mb-4 text-sm font-bold">Expenses by Department</h3>
           <div className="h-72">
-            {deptData.length === 0 ? <Empty /> : (
+            {deptData.length === 0 ? (
+              <Empty />
+            ) : (
               <ResponsiveContainer>
                 <PieChart>
-                  <Pie data={deptData} dataKey="value" nameKey="name" outerRadius={100} innerRadius={55}>
-                    {deptData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  <Pie
+                    data={deptData}
+                    dataKey="value"
+                    nameKey="name"
+                    outerRadius={100}
+                    innerRadius={55}
+                  >
+                    {deptData.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
                   </Pie>
-                  <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }}
-                    formatter={(v: number) => formatMoney(v, currency)} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                    }}
+                    formatter={(v: number) => formatMoney(v, currency)}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -209,13 +297,40 @@ function ExpensesPage() {
             <ResponsiveContainer>
               <LineChart data={days}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="d" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }}
-                  formatter={(v: number) => formatMoney(v, currency)} />
+                <XAxis
+                  dataKey="d"
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--popover)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                  }}
+                  formatter={(v: number) => formatMoney(v, currency)}
+                />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey="income" stroke="var(--brand-success)" strokeWidth={2.5} dot={false} />
-                <Line type="monotone" dataKey="expense" stroke="var(--brand-danger)" strokeWidth={2.5} dot={false} />
+                <Line
+                  type="monotone"
+                  dataKey="income"
+                  stroke="var(--brand-success)"
+                  strokeWidth={2.5}
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="expense"
+                  stroke="var(--brand-danger)"
+                  strokeWidth={2.5}
+                  dot={false}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -245,33 +360,53 @@ function ExpensesPage() {
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={7} className="p-10 text-center text-muted-foreground">No expenses yet.</td></tr>
-              ) : rows.slice(0, 50).map((r) => (
-                <tr key={r.id} className="border-b border-border/60 hover:bg-muted/30">
-                  <td className="px-4 py-3">{format(new Date(r.entry_date), "d MMM yyyy")}</td>
-                  <td className="px-4 py-3">{departments.find((d) => d.id === r.department_id)?.name || "—"}</td>
-                  <td className="px-4 py-3">{r.purpose}</td>
-                  <td className="px-4 py-3 text-right font-semibold kpi-number text-brand-danger">
-                    −{formatMoney(Number(r.amount), currency)}
-                  </td>
-                  <td className="px-4 py-3">{nameOf(r.created_by)}</td>
-                  <td className="px-4 py-3"><StatusBadge s={r.status} /></td>
-                  <td className="px-4 py-3">
-                    {r.status === "pending" && canApprove ? (
-                      <div className="flex justify-end gap-1">
-                        <Button size="icon" variant="outline" className="h-7 w-7 text-brand-success"
-                          onClick={() => approve.mutate({ id: r.id, status: "approved" })}>
-                          <Check className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="icon" variant="outline" className="h-7 w-7 text-brand-danger"
-                          onClick={() => approve.mutate({ id: r.id, status: "rejected" })}>
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    ) : <span className="text-xs text-muted-foreground">—</span>}
+                <tr>
+                  <td colSpan={7} className="p-10 text-center text-muted-foreground">
+                    No expenses yet.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                rows.slice(0, 50).map((r) => (
+                  <tr key={r.id} className="border-b border-border/60 hover:bg-muted/30">
+                    <td className="px-4 py-3">{format(new Date(r.entry_date), "d MMM yyyy")}</td>
+                    <td className="px-4 py-3">
+                      {departments.find((d) => d.id === r.department_id)?.name || "—"}
+                    </td>
+                    <td className="px-4 py-3">{r.purpose}</td>
+                    <td className="px-4 py-3 text-right font-semibold kpi-number text-brand-danger">
+                      −{formatMoney(Number(r.amount), currency)}
+                    </td>
+                    <td className="px-4 py-3">{nameOf(r.created_by)}</td>
+                    <td className="px-4 py-3">
+                      <StatusBadge s={r.status} />
+                    </td>
+                    <td className="px-4 py-3">
+                      {r.status === "pending" && canApprove ? (
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-7 w-7 text-brand-success"
+                            onClick={() => approve.mutate({ id: r.id, status: "approved" })}
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-7 w-7 text-brand-danger"
+                            onClick={() => approve.mutate({ id: r.id, status: "rejected" })}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -288,18 +423,31 @@ function StatusBadge({ s }: { s: string }) {
     rejected: "bg-brand-danger/15 text-brand-danger",
   };
   return (
-    <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold uppercase", map[s] || "bg-muted text-muted-foreground")}>
+    <span
+      className={cn(
+        "rounded-full px-2 py-0.5 text-[11px] font-bold uppercase",
+        map[s] || "bg-muted text-muted-foreground",
+      )}
+    >
       {s}
     </span>
   );
 }
 
 function Empty() {
-  return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No data</div>;
+  return (
+    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      No data
+    </div>
+  );
 }
 
 function NewExpenseButton({
-  categories, methods, departments, defaultCurrency, mode,
+  categories,
+  methods,
+  departments,
+  defaultCurrency,
+  mode,
 }: {
   categories: { id: string; name: string }[];
   methods: { id: string; name: string }[];
@@ -346,12 +494,19 @@ function NewExpenseButton({
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>{label}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{label}</DialogTitle>
+        </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Date</Label>
-              <Input name="entry_date" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
+              <Input
+                name="entry_date"
+                type="date"
+                defaultValue={format(new Date(), "yyyy-MM-dd")}
+                required
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Amount</Label>
@@ -362,7 +517,9 @@ function NewExpenseButton({
             <div className="space-y-1.5">
               <Label>Currency</Label>
               <Select name="currency" defaultValue={defaultCurrency}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="XCFA">XCFA</SelectItem>
                   <SelectItem value="USD">USD</SelectItem>
@@ -372,9 +529,15 @@ function NewExpenseButton({
             <div className="space-y-1.5">
               <Label>Category</Label>
               <Select name="category_id">
-                <SelectTrigger><SelectValue placeholder="Choose" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose" />
+                </SelectTrigger>
                 <SelectContent>
-                  {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -382,9 +545,15 @@ function NewExpenseButton({
           <div className="space-y-1.5">
             <Label>Department</Label>
             <Select name="department_id">
-              <SelectTrigger><SelectValue placeholder="Department" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Department" />
+              </SelectTrigger>
               <SelectContent>
-                {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                {departments.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -396,9 +565,15 @@ function NewExpenseButton({
             <div className="space-y-1.5">
               <Label>Payment method</Label>
               <Select name="payment_method_id">
-                <SelectTrigger><SelectValue placeholder="Method" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Method" />
+                </SelectTrigger>
                 <SelectContent>
-                  {methods.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                  {methods.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

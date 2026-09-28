@@ -7,10 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Plus, Loader2, Download, Folder, FileText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -27,7 +36,8 @@ function DocumentsPage() {
 
   const { data: folders = [] } = useQuery({
     queryKey: ["doc-folders"],
-    queryFn: async () => (await supabase.from("document_folders").select("*").order("sort_order")).data ?? [],
+    queryFn: async () =>
+      (await supabase.from("document_folders").select("*").order("sort_order")).data ?? [],
   });
   const { data: docs = [] } = useQuery({
     queryKey: ["documents", folderId],
@@ -64,7 +74,11 @@ function DocumentsPage() {
             Folders
           </h3>
           <div className="space-y-1">
-            <FolderRow active={folderId === "all"} onClick={() => setFolderId("all")} label="All Documents" />
+            <FolderRow
+              active={folderId === "all"}
+              onClick={() => setFolderId("all")}
+              label="All Documents"
+            />
             {folders.map((f) => (
               <FolderRow
                 key={f.id}
@@ -85,20 +99,39 @@ function DocumentsPage() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {docs.map((d) => (
-                <div key={d.id} className="tos-card group cursor-pointer" onClick={() => openDoc(d.file_path)}>
+                <div
+                  key={d.id}
+                  className="tos-card group cursor-pointer"
+                  onClick={() => openDoc(d.file_path)}
+                >
                   <div className="icon-tile mb-3 bg-primary/15 text-primary">
                     <FileText className="h-5 w-5" />
                   </div>
                   <div className="mb-1 truncate text-sm font-semibold">{d.name}</div>
                   <div className="mb-2 truncate text-xs text-muted-foreground">
-                    {folders.find((f) => f.id === d.folder_id)?.name || "—"} · {format(new Date(d.created_at), "d MMM yyyy")}
+                    {folders.find((f) => f.id === d.folder_id)?.name || "—"} ·{" "}
+                    {format(new Date(d.created_at), "d MMM yyyy")}
                   </div>
                   <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
-                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openDoc(d.file_path); }}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDoc(d.file_path);
+                      }}
+                    >
                       <Download className="h-3 w-3" />
                     </Button>
-                    <Button size="sm" variant="outline" className="text-brand-danger"
-                      onClick={(e) => { e.stopPropagation(); del(d.id, d.file_path); }}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-brand-danger"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        del(d.id, d.file_path);
+                      }}
+                    >
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
@@ -112,13 +145,23 @@ function DocumentsPage() {
   );
 }
 
-function FolderRow({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function FolderRow({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
-    <button onClick={onClick}
+    <button
+      onClick={onClick}
       className={cn(
         "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
         active ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted",
-      )}>
+      )}
+    >
       <Folder className="h-4 w-4 text-brand-yellow" />
       <span className="truncate">{label}</span>
     </button>
@@ -137,10 +180,18 @@ function UploadButton({ folders }: { folders: { id: string; name: string }[] }) 
     if (!file || !file.size) return toast.error("Choose a file");
     setLoading(true);
     const { data: u } = await supabase.auth.getUser();
-    if (!u.user) { setLoading(false); return toast.error("Not signed in"); }
+    if (!u.user) {
+      setLoading(false);
+      return toast.error("Not signed in");
+    }
     const path = `${u.user.id}/${Date.now()}-${file.name}`;
-    const up = await supabase.storage.from("documents").upload(path, file, { contentType: file.type });
-    if (up.error) { setLoading(false); return toast.error(up.error.message); }
+    const up = await supabase.storage
+      .from("documents")
+      .upload(path, file, { contentType: file.type });
+    if (up.error) {
+      setLoading(false);
+      return toast.error(up.error.message);
+    }
     const { error } = await supabase.from("documents").insert({
       name: String(fd.get("name") || file.name),
       description: String(fd.get("description") || "") || null,
@@ -160,10 +211,14 @@ function UploadButton({ folders }: { folders: { id: string; name: string }[] }) 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gradient-brand text-white"><Plus className="mr-1.5 h-4 w-4" /> Upload Document</Button>
+        <Button className="gradient-brand text-white">
+          <Plus className="mr-1.5 h-4 w-4" /> Upload Document
+        </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Upload Document</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Upload Document</DialogTitle>
+        </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
           <div className="space-y-1.5">
             <Label>File</Label>
@@ -176,9 +231,15 @@ function UploadButton({ folders }: { folders: { id: string; name: string }[] }) 
           <div className="space-y-1.5">
             <Label>Folder</Label>
             <Select name="folder_id">
-              <SelectTrigger><SelectValue placeholder="Choose folder" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose folder" />
+              </SelectTrigger>
               <SelectContent>
-                {folders.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                {folders.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

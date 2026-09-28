@@ -6,10 +6,26 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+const isGitHubPages = process.env.GITHUB_PAGES === "true";
+const repositoryName = process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "tns-opus-flow-cc572a6b";
+const pagesBasePath = isGitHubPages ? `/${repositoryName}` : "";
+
 export default defineConfig({
+  nitro: isGitHubPages ? false : undefined,
+  vite: {
+    base: pagesBasePath ? `${pagesBasePath}/` : "/",
+  },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+    router: pagesBasePath ? { basepath: pagesBasePath } : {},
+    spa: isGitHubPages
+      ? {
+          enabled: true,
+          maskPath: "/",
+          prerender: { outputPath: "/index" },
+        }
+      : undefined,
   },
 });

@@ -27,7 +27,9 @@ export function deriveStatus(events: { event_type: AttendanceEventType; event_at
   }
 }
 
-export function computeDailyTotals(events: { event_type: AttendanceEventType; event_at: string }[]) {
+export function computeDailyTotals(
+  events: { event_type: AttendanceEventType; event_at: string }[],
+) {
   const sorted = [...events].sort(
     (a, b) => new Date(a.event_at).getTime() - new Date(b.event_at).getTime(),
   );

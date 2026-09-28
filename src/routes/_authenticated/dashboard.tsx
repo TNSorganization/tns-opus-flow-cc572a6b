@@ -3,7 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeInvalidate } from "@/hooks/use-realtime";
 import { deriveStatus, type AttendanceEventType } from "@/lib/attendance";
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, subDays } from "date-fns";
+import {
+  startOfDay,
+  endOfDay,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  format,
+  subDays,
+} from "date-fns";
 import { cn } from "@/lib/utils";
 import {
   ResponsiveContainer,
@@ -54,11 +63,8 @@ function DashboardPage() {
   const { data: tasks = [] } = useQuery({
     queryKey: ["dash-tasks"],
     queryFn: async () =>
-      (
-        await supabase
-          .from("tasks")
-          .select("id, status, deadline, completed_at, assigned_to")
-      ).data ?? [],
+      (await supabase.from("tasks").select("id, status, deadline, completed_at, assigned_to"))
+        .data ?? [],
   });
   const { data: incomes = [] } = useQuery({
     queryKey: ["dash-incomes"],
@@ -128,7 +134,9 @@ function DashboardPage() {
     days.push({
       d: format(d, "d MMM"),
       income: incomes.filter((x) => x.entry_date === key).reduce((a, b) => a + Number(b.amount), 0),
-      expense: expenses.filter((x) => x.entry_date === key).reduce((a, b) => a + Number(b.amount), 0),
+      expense: expenses
+        .filter((x) => x.entry_date === key)
+        .reduce((a, b) => a + Number(b.amount), 0),
     });
   }
 
@@ -140,7 +148,9 @@ function DashboardPage() {
       </header>
 
       <section>
-        <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Today</h2>
+        <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Today
+        </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card label="Working" value={counts.present} tone="working" />
           <Card label="On break" value={counts.on_break} tone="break" />
@@ -150,7 +160,9 @@ function DashboardPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Tasks</h2>
+        <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Tasks
+        </h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <Card label="Done today" value={doneToday} />
           <Card label="Pending" value={pending} />
@@ -159,12 +171,19 @@ function DashboardPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Finance</h2>
+        <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Finance
+        </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card label="Week in" value={money(inWeek)} tone="working" mono />
           <Card label="Week out" value={money(outWeek)} tone="absent" mono />
           <Card label="Month in" value={money(inMonth)} tone="working" mono />
-          <Card label="Month profit" value={money(inMonth - outMonth)} tone={inMonth - outMonth >= 0 ? "working" : "absent"} mono />
+          <Card
+            label="Month profit"
+            value={money(inMonth - outMonth)}
+            tone={inMonth - outMonth >= 0 ? "working" : "absent"}
+            mono
+          />
         </div>
 
         <div className="surface mt-4 p-4">
@@ -183,8 +202,17 @@ function DashboardPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="d" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickLine={false} axisLine={false} />
+                <XAxis
+                  dataKey="d"
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <Tooltip
                   contentStyle={{
                     background: "var(--popover)",
@@ -192,8 +220,20 @@ function DashboardPage() {
                     borderRadius: 8,
                   }}
                 />
-                <Area type="monotone" dataKey="income" stroke="var(--status-present)" fill="url(#inc)" strokeWidth={2} />
-                <Area type="monotone" dataKey="expense" stroke="var(--status-absent)" fill="url(#exp)" strokeWidth={2} />
+                <Area
+                  type="monotone"
+                  dataKey="income"
+                  stroke="var(--status-present)"
+                  fill="url(#inc)"
+                  strokeWidth={2}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="expense"
+                  stroke="var(--status-absent)"
+                  fill="url(#exp)"
+                  strokeWidth={2}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -227,7 +267,9 @@ function Card({
   return (
     <div className="surface p-4">
       <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={cn("mt-2 text-2xl font-semibold", mono && "kpi-number", toneCls)}>{value}</div>
+      <div className={cn("mt-2 text-2xl font-semibold", mono && "kpi-number", toneCls)}>
+        {value}
+      </div>
     </div>
   );
 }

@@ -56,14 +56,20 @@ function TasksPage() {
   const { data: me } = useCurrentRoles();
   const canCreate = isOps(me?.roles ?? []);
   const canValidate = canCreate;
-  useRealtimeInvalidate("tasks-live", ["tasks", "task_checklist_items"], [["tasks"], ["badge-tasks-overdue"]]);
+  useRealtimeInvalidate(
+    "tasks-live",
+    ["tasks", "task_checklist_items"],
+    [["tasks"], ["badge-tasks-overdue"]],
+  );
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["tasks"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tasks")
-        .select("id, title, description, priority, status, deadline, assigned_to, assigned_by, progress")
+        .select(
+          "id, title, description, priority, status, deadline, assigned_to, assigned_by, progress",
+        )
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -139,7 +145,8 @@ function TasksPage() {
                     </div>
                   ) : (
                     items.map((t) => {
-                      const overdue = t.deadline && isPast(new Date(t.deadline)) && t.status !== "completed";
+                      const overdue =
+                        t.deadline && isPast(new Date(t.deadline)) && t.status !== "completed";
                       const mine = t.assigned_to === me?.userId;
                       return (
                         <div
@@ -212,7 +219,12 @@ function TaskActions({
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
       {mine && s === "not_started" && (
-        <Button size="sm" variant="secondary" className="h-7 text-xs" onClick={() => onMove("in_progress")}>
+        <Button
+          size="sm"
+          variant="secondary"
+          className="h-7 text-xs"
+          onClick={() => onMove("in_progress")}
+        >
           Start
         </Button>
       )}
@@ -222,22 +234,41 @@ function TaskActions({
         </Button>
       )}
       {canValidate && s === "submitted" && (
-        <Button size="sm" className="h-7 bg-brand-success text-xs hover:bg-brand-success/90" onClick={() => onMove("completed")}>
+        <Button
+          size="sm"
+          className="h-7 bg-brand-success text-xs hover:bg-brand-success/90"
+          onClick={() => onMove("completed")}
+        >
           <ShieldCheck className="mr-1 h-3 w-3" /> Validate
         </Button>
       )}
       {canValidate && s === "submitted" && (
-        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onMove("in_progress")}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs"
+          onClick={() => onMove("in_progress")}
+        >
           Reject
         </Button>
       )}
       {canValidate && s !== "completed" && s !== "submitted" && (
-        <Button size="sm" variant="ghost" className="h-7 text-xs text-brand-success" onClick={() => onMove("completed")}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 text-xs text-brand-success"
+          onClick={() => onMove("completed")}
+        >
           <CheckCircle2 className="mr-1 h-3 w-3" /> Mark done
         </Button>
       )}
       {canValidate && s === "completed" && (
-        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onMove("in_progress")}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 text-xs"
+          onClick={() => onMove("in_progress")}
+        >
           Reopen
         </Button>
       )}
@@ -291,10 +322,14 @@ function NewTaskDialog({
           <div className="space-y-1.5">
             <Label>Priority</Label>
             <Select name="priority" defaultValue="medium">
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {PRIORITIES.map((p) => (
-                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -307,7 +342,9 @@ function NewTaskDialog({
         <div className="space-y-1.5">
           <Label>Assign to</Label>
           <Select name="assigned_to">
-            <SelectTrigger><SelectValue placeholder="Choose person" /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="Choose person" />
+            </SelectTrigger>
             <SelectContent>
               {people.map((p) => (
                 <SelectItem key={p.id} value={p.id}>

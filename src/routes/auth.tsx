@@ -9,7 +9,8 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import tnsMark from "@/assets/tns-mark-white.png";
+import { BrandLogo } from "@/components/brand-logo";
+import { getAppUrl } from "@/lib/app-url";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -86,7 +87,7 @@ function AuthPage() {
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: getAppUrl(),
         data: { full_name: fullName },
       },
     });
@@ -104,7 +105,9 @@ function AuthPage() {
     } else if (matricule) {
       try {
         localStorage.setItem("pending_matricule", matricule);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
 
     setLoading(false);
@@ -119,7 +122,7 @@ function AuthPage() {
   async function google() {
     setLoading(true);
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+      redirect_uri: getAppUrl(),
     });
     if (result.error) {
       setLoading(false);
@@ -140,26 +143,41 @@ function AuthPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="pointer-events-none absolute inset-0 opacity-40"
-        style={{ background: "radial-gradient(ellipse at top, color-mix(in oklab, var(--primary) 25%, transparent), transparent 55%)" }} />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-40"
+        style={{
+          background:
+            "radial-gradient(ellipse at top, color-mix(in oklab, var(--primary) 25%, transparent), transparent 55%)",
+        }}
+      />
       <div className="relative w-full max-w-md">
         <div className="mb-8 text-center">
-          <img src={tnsMark} alt="TNS" className="mx-auto mb-4 h-14 w-14" />
-          <h1 className="text-2xl font-semibold tracking-tight">TNS Operations System</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Sign in with your 6-digit PIN.
-          </p>
+          <BrandLogo kind="logo" className="mx-auto mb-5 w-56 max-w-[70vw]" />
+          <h1 className="text-2xl font-semibold tracking-tight">Operations System</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Sign in with your 6-digit PIN.</p>
         </div>
 
         <Card className="surface p-6">
-          <Button variant="outline" className="w-full" onClick={google} disabled={loading} type="button">
-            <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24"><path fill="currentColor"
-              d="M21.35 11.1H12v3.2h5.35c-.23 1.5-1.68 4.4-5.35 4.4-3.22 0-5.85-2.67-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.57-2.47C16.83 4.34 14.66 3.5 12 3.5 7.03 3.5 3 7.53 3 12.5s4.03 9 9 9c5.2 0 8.63-3.65 8.63-8.78 0-.6-.06-1.05-.13-1.62z"/></svg>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={google}
+            disabled={loading}
+            type="button"
+          >
+            <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+              <path
+                fill="currentColor"
+                d="M21.35 11.1H12v3.2h5.35c-.23 1.5-1.68 4.4-5.35 4.4-3.22 0-5.85-2.67-5.85-5.95S8.78 6.8 12 6.8c1.83 0 3.06.78 3.76 1.45l2.57-2.47C16.83 4.34 14.66 3.5 12 3.5 7.03 3.5 3 7.53 3 12.5s4.03 9 9 9c5.2 0 8.63-3.65 8.63-8.78 0-.6-.06-1.05-.13-1.62z"
+              />
+            </svg>
             Continue with Google
           </Button>
 
           <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-            <div className="h-px flex-1 bg-border" />or<div className="h-px flex-1 bg-border" />
+            <div className="h-px flex-1 bg-border" />
+            or
+            <div className="h-px flex-1 bg-border" />
           </div>
 
           <Tabs defaultValue="signin">
@@ -177,11 +195,25 @@ function AuthPage() {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="si-pw">6-digit PIN</Label>
-                    <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">Forgot?</Link>
+                    <Link
+                      to="/forgot-password"
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Forgot?
+                    </Link>
                   </div>
-                  <Input id="si-pw" name="password" type="password" inputMode="numeric"
-                    pattern="\d{6}" maxLength={6} minLength={6} required
-                    autoComplete="current-password" className="tracking-[0.5em] text-center font-mono" />
+                  <Input
+                    id="si-pw"
+                    name="password"
+                    type="password"
+                    inputMode="numeric"
+                    pattern="\d{6}"
+                    maxLength={6}
+                    minLength={6}
+                    required
+                    autoComplete="current-password"
+                    className="tracking-[0.5em] text-center font-mono"
+                  />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
@@ -201,16 +233,32 @@ function AuthPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="su-pw">6-digit PIN</Label>
-                  <Input id="su-pw" name="password" type="password" inputMode="numeric"
-                    pattern="\d{6}" maxLength={6} minLength={6} required
-                    autoComplete="new-password" className="tracking-[0.5em] text-center font-mono" />
+                  <Input
+                    id="su-pw"
+                    name="password"
+                    type="password"
+                    inputMode="numeric"
+                    pattern="\d{6}"
+                    maxLength={6}
+                    minLength={6}
+                    required
+                    autoComplete="new-password"
+                    className="tracking-[0.5em] text-center font-mono"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="su-matricule">Matricule</Label>
-                  <Input id="su-matricule" name="matricule" type="text" placeholder="Code from the CEO"
-                    autoComplete="off" className="uppercase tracking-wider" />
+                  <Input
+                    id="su-matricule"
+                    name="matricule"
+                    type="text"
+                    placeholder="Code from the CEO"
+                    autoComplete="off"
+                    className="uppercase tracking-wider"
+                  />
                   <p className="text-[11px] text-muted-foreground">
-                    Required unless you're the first user. You'll re-confirm it in Settings to unlock the app.
+                    Required unless you're the first user. You'll re-confirm it in Settings to
+                    unlock the app.
                   </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>

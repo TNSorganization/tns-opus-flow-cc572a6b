@@ -12,8 +12,7 @@
 @theme inline {
   --font-sans:
     "Geist Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono:
-    "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -89,7 +88,7 @@
   --popover: oklch(0.19 0.012 265);
   --popover-foreground: oklch(0.985 0.005 250);
 
-  --primary: oklch(0.68 0.19 275);      /* electric indigo */
+  --primary: oklch(0.68 0.19 275); /* electric indigo */
   --primary-foreground: oklch(0.985 0.005 250);
 
   --secondary: oklch(0.24 0.015 265);
@@ -124,21 +123,21 @@
   --sidebar-ring: oklch(0.68 0.19 275 / 50%);
 
   /* Status */
-  --status-present: oklch(0.75 0.17 155);  /* green */
-  --status-break:   oklch(0.82 0.15 85);   /* amber */
-  --status-working: oklch(0.72 0.16 240);  /* blue */
-  --status-absent:  oklch(0.65 0.24 25);   /* red */
-  --status-off:     oklch(0.55 0.02 265);  /* grey */
+  --status-present: oklch(0.75 0.17 155); /* green */
+  --status-break: oklch(0.82 0.15 85); /* amber */
+  --status-working: oklch(0.72 0.16 240); /* blue */
+  --status-absent: oklch(0.65 0.24 25); /* red */
+  --status-off: oklch(0.55 0.02 265); /* grey */
 
   /* Brand palette (prototype) */
-  --brand-purple:  oklch(0.68 0.22 305);   /* #a855f7 */
-  --brand-pink:    oklch(0.66 0.24 355);   /* #ec4899 */
-  --brand-teal:    oklch(0.72 0.13 190);   /* #14b8a6 */
-  --brand-orange:  oklch(0.72 0.19 55);    /* #f97316 */
-  --brand-yellow:  oklch(0.82 0.15 85);    /* #f59e0b */
-  --brand-info:    oklch(0.68 0.17 245);   /* #3b82f6 */
-  --brand-success: oklch(0.72 0.19 150);   /* #22c55e */
-  --brand-danger:  oklch(0.65 0.24 25);    /* #ef4444 */
+  --brand-purple: oklch(0.68 0.22 305); /* #a855f7 */
+  --brand-pink: oklch(0.66 0.24 355); /* #ec4899 */
+  --brand-teal: oklch(0.72 0.13 190); /* #14b8a6 */
+  --brand-orange: oklch(0.72 0.19 55); /* #f97316 */
+  --brand-yellow: oklch(0.82 0.15 85); /* #f59e0b */
+  --brand-info: oklch(0.68 0.17 245); /* #3b82f6 */
+  --brand-success: oklch(0.72 0.19 150); /* #22c55e */
+  --brand-danger: oklch(0.65 0.24 25); /* #ef4444 */
 }
 
 /* Light mode (opt-in) */
@@ -193,8 +192,28 @@
   }
 }
 
+.brand-logo {
+  display: block;
+}
+
+.brand-logo-on-light {
+  display: none;
+}
+
+.light .brand-logo-on-dark {
+  display: none;
+}
+
+.light .brand-logo-on-light {
+  display: block;
+}
+
 @utility surface {
-  background: linear-gradient(180deg, color-mix(in oklab, var(--card) 100%, transparent), color-mix(in oklab, var(--card) 92%, transparent));
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--card) 100%, transparent),
+    color-mix(in oklab, var(--card) 92%, transparent)
+  );
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 }
@@ -210,7 +229,10 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 .tos-card:hover {
   transform: translateY(-2px);

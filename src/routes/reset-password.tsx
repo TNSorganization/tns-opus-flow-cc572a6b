@@ -36,9 +36,17 @@ function ResetPasswordPage() {
         <form onSubmit={submit} className="mt-6 space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="pw">New PIN</Label>
-            <Input id="pw" name="password" type="password" inputMode="numeric"
-              pattern="\d{6}" maxLength={6} minLength={6} required
-              className="tracking-[0.5em] text-center font-mono" />
+            <Input
+              id="pw"
+              name="password"
+              type="password"
+              inputMode="numeric"
+              pattern="\d{6}"
+              maxLength={6}
+              minLength={6}
+              required
+              className="tracking-[0.5em] text-center font-mono"
+            />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             Update password

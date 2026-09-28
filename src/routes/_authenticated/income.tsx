@@ -21,13 +21,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, ArrowDown, Loader2, Calendar, CalendarDays, PieChart as PieIcon, Trash2 } from "lucide-react";
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
+import {
+  Plus,
+  ArrowDown,
+  Loader2,
+  Calendar,
+  CalendarDays,
+  PieChart as PieIcon,
+  Trash2,
+} from "lucide-react";
+import {
+  format,
+  startOfDay,
+  endOfDay,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  subDays,
+} from "date-fns";
 import { toast } from "sonner";
 import { KpiCard, SectionHeader } from "@/components/kpi-card";
 import { formatMoney, type Currency } from "@/lib/currency";
 import {
-  ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
 } from "recharts";
 import { useCurrentRoles, isFinance as isFin } from "@/hooks/use-current-role";
 
@@ -36,8 +62,14 @@ export const Route = createFileRoute("/_authenticated/income")({
 });
 
 const PIE_COLORS = [
-  "var(--primary)", "var(--brand-purple)", "var(--brand-teal)", "var(--brand-info)",
-  "var(--brand-yellow)", "var(--brand-orange)", "var(--brand-pink)", "var(--brand-success)",
+  "var(--primary)",
+  "var(--brand-purple)",
+  "var(--brand-teal)",
+  "var(--brand-info)",
+  "var(--brand-yellow)",
+  "var(--brand-orange)",
+  "var(--brand-pink)",
+  "var(--brand-success)",
 ];
 
 function IncomePage() {
@@ -52,7 +84,9 @@ function IncomePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("income_entries")
-        .select("id, entry_date, amount, currency, description, source_id, payment_method_id, reference, created_by")
+        .select(
+          "id, entry_date, amount, currency, description, source_id, payment_method_id, reference, created_by",
+        )
         .eq("currency", currency)
         .order("entry_date", { ascending: false })
         .limit(500);
@@ -64,16 +98,19 @@ function IncomePage() {
   const { data: sources = [] } = useQuery({
     queryKey: ["income-sources"],
     queryFn: async () =>
-      (await supabase.from("income_sources").select("*").eq("active", true).order("name")).data ?? [],
+      (await supabase.from("income_sources").select("*").eq("active", true).order("name")).data ??
+      [],
   });
   const { data: methods = [] } = useQuery({
     queryKey: ["payment-methods"],
     queryFn: async () =>
-      (await supabase.from("payment_methods").select("*").eq("active", true).order("name")).data ?? [],
+      (await supabase.from("payment_methods").select("*").eq("active", true).order("name")).data ??
+      [],
   });
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-min"],
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
+    queryFn: async () =>
+      (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
   });
 
   const inRange = (d: string, from: Date, to: Date) => {
@@ -84,7 +121,10 @@ function IncomePage() {
     rows.filter((r) => inRange(r.entry_date, from, to)).reduce((a, b) => a + Number(b.amount), 0);
 
   const todayTotal = sumRange(startOfDay(today), endOfDay(today));
-  const weekTotal = sumRange(startOfWeek(today, { weekStartsOn: 1 }), endOfWeek(today, { weekStartsOn: 1 }));
+  const weekTotal = sumRange(
+    startOfWeek(today, { weekStartsOn: 1 }),
+    endOfWeek(today, { weekStartsOn: 1 }),
+  );
   const monthTotal = sumRange(startOfMonth(today), endOfMonth(today));
 
   const bySource = new Map<string, number>();
@@ -115,11 +155,7 @@ function IncomePage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         {canRecord ? (
-          <NewIncomeButton
-            sources={sources}
-            methods={methods}
-            defaultCurrency={currency}
-          />
+          <NewIncomeButton sources={sources} methods={methods} defaultCurrency={currency} />
         ) : (
           <span className="text-xs text-muted-foreground">
             View-only. Only Finance can record income.
@@ -142,14 +178,30 @@ function IncomePage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard tone="success" icon={<ArrowDown className="h-5 w-5" />}
-          value={formatMoney(todayTotal, currency)} label="Today's Income" />
-        <KpiCard tone="info" icon={<Calendar className="h-5 w-5" />}
-          value={formatMoney(weekTotal, currency)} label="This Week" />
-        <KpiCard tone="purple" icon={<CalendarDays className="h-5 w-5" />}
-          value={formatMoney(monthTotal, currency)} label="This Month" />
-        <KpiCard tone="teal" icon={<PieIcon className="h-5 w-5" />}
-          value={<span className="text-xl">{topSource}</span>} label="Top Income Source" />
+        <KpiCard
+          tone="success"
+          icon={<ArrowDown className="h-5 w-5" />}
+          value={formatMoney(todayTotal, currency)}
+          label="Today's Income"
+        />
+        <KpiCard
+          tone="info"
+          icon={<Calendar className="h-5 w-5" />}
+          value={formatMoney(weekTotal, currency)}
+          label="This Week"
+        />
+        <KpiCard
+          tone="purple"
+          icon={<CalendarDays className="h-5 w-5" />}
+          value={formatMoney(monthTotal, currency)}
+          label="This Month"
+        />
+        <KpiCard
+          tone="teal"
+          icon={<PieIcon className="h-5 w-5" />}
+          value={<span className="text-xl">{topSource}</span>}
+          label="Top Income Source"
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -161,13 +213,25 @@ function IncomePage() {
             ) : (
               <ResponsiveContainer>
                 <PieChart>
-                  <Pie data={sourceData} dataKey="value" nameKey="name" outerRadius={100} innerRadius={55}>
+                  <Pie
+                    data={sourceData}
+                    dataKey="value"
+                    nameKey="name"
+                    outerRadius={100}
+                    innerRadius={55}
+                  >
                     {sourceData.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }}
-                    formatter={(v: number) => formatMoney(v, currency)} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                    }}
+                    formatter={(v: number) => formatMoney(v, currency)}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -179,11 +243,32 @@ function IncomePage() {
             <ResponsiveContainer>
               <LineChart data={trend}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="d" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }}
-                  formatter={(v: number) => formatMoney(v, currency)} />
-                <Line type="monotone" dataKey="v" stroke="var(--brand-success)" strokeWidth={2.5} dot={false} />
+                <XAxis
+                  dataKey="d"
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--popover)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                  }}
+                  formatter={(v: number) => formatMoney(v, currency)}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="v"
+                  stroke="var(--brand-success)"
+                  strokeWidth={2.5}
+                  dot={false}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -207,33 +292,54 @@ function IncomePage() {
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={canRecord ? 7 : 6} className="p-10 text-center text-muted-foreground">No income yet.</td></tr>
-              ) : rows.slice(0, 50).map((r) => (
-                <tr key={r.id} className="border-b border-border/60 hover:bg-muted/30">
-                  <td className="px-4 py-3">{format(new Date(r.entry_date), "d MMM yyyy")}</td>
-                  <td className="px-4 py-3">{sources.find((s) => s.id === r.source_id)?.name || "—"}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{r.description || "—"}</td>
-                  <td className="px-4 py-3 text-right font-semibold kpi-number text-brand-success">
-                    +{formatMoney(Number(r.amount), currency)}
+                <tr>
+                  <td
+                    colSpan={canRecord ? 7 : 6}
+                    className="p-10 text-center text-muted-foreground"
+                  >
+                    No income yet.
                   </td>
-                  <td className="px-4 py-3">{methods.find((m) => m.id === r.payment_method_id)?.name || "—"}</td>
-                  <td className="px-4 py-3">{nameOf(r.created_by)}</td>
-                  {canRecord && (
-                    <td className="px-4 py-3 text-right">
-                      <Button size="icon" variant="ghost" className="h-7 w-7"
-                        onClick={async () => {
-                          if (!confirm("Delete this income entry? This cannot be undone.")) return;
-                          const { error } = await supabase.from("income_entries").delete().eq("id", r.id);
-                          if (error) return toast.error(error.message);
-                          toast.success("Deleted");
-                          qc.invalidateQueries({ queryKey: ["income"] });
-                        }}>
-                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-                      </Button>
-                    </td>
-                  )}
                 </tr>
-              ))}
+              ) : (
+                rows.slice(0, 50).map((r) => (
+                  <tr key={r.id} className="border-b border-border/60 hover:bg-muted/30">
+                    <td className="px-4 py-3">{format(new Date(r.entry_date), "d MMM yyyy")}</td>
+                    <td className="px-4 py-3">
+                      {sources.find((s) => s.id === r.source_id)?.name || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{r.description || "—"}</td>
+                    <td className="px-4 py-3 text-right font-semibold kpi-number text-brand-success">
+                      +{formatMoney(Number(r.amount), currency)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {methods.find((m) => m.id === r.payment_method_id)?.name || "—"}
+                    </td>
+                    <td className="px-4 py-3">{nameOf(r.created_by)}</td>
+                    {canRecord && (
+                      <td className="px-4 py-3 text-right">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={async () => {
+                            if (!confirm("Delete this income entry? This cannot be undone."))
+                              return;
+                            const { error } = await supabase
+                              .from("income_entries")
+                              .delete()
+                              .eq("id", r.id);
+                            if (error) return toast.error(error.message);
+                            toast.success("Deleted");
+                            qc.invalidateQueries({ queryKey: ["income"] });
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                        </Button>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -243,7 +349,11 @@ function IncomePage() {
 }
 
 function Empty() {
-  return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No data</div>;
+  return (
+    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      No data
+    </div>
+  );
 }
 
 function NewIncomeButton({
@@ -289,12 +399,19 @@ function NewIncomeButton({
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Record Income</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Record Income</DialogTitle>
+        </DialogHeader>
         <form onSubmit={submit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Date</Label>
-              <Input name="entry_date" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
+              <Input
+                name="entry_date"
+                type="date"
+                defaultValue={format(new Date(), "yyyy-MM-dd")}
+                required
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Amount</Label>
@@ -305,7 +422,9 @@ function NewIncomeButton({
             <div className="space-y-1.5">
               <Label>Currency</Label>
               <Select name="currency" defaultValue={defaultCurrency}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="XCFA">XCFA</SelectItem>
                   <SelectItem value="USD">USD</SelectItem>
@@ -315,9 +434,15 @@ function NewIncomeButton({
             <div className="space-y-1.5">
               <Label>Source</Label>
               <Select name="source_id">
-                <SelectTrigger><SelectValue placeholder="Choose source" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose source" />
+                </SelectTrigger>
                 <SelectContent>
-                  {sources.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  {sources.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -325,9 +450,15 @@ function NewIncomeButton({
           <div className="space-y-1.5">
             <Label>Payment method</Label>
             <Select name="payment_method_id">
-              <SelectTrigger><SelectValue placeholder="Method" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Method" />
+              </SelectTrigger>
               <SelectContent>
-                {methods.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                {methods.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
