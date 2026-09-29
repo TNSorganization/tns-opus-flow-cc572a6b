@@ -1,8 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeInvalidate } from "@/hooks/use-realtime";
 import { deriveStatus, type AttendanceEventType } from "@/lib/attendance";
+import { formatMoney, type Currency } from "@/lib/currency";
+import { fetchActiveProfiles } from "@/lib/profiles";
 import {
   startOfDay,
   endOfDay,
@@ -11,6 +14,7 @@ import {
   startOfMonth,
   endOfMonth,
   format,
+  parseISO,
   subDays,
 } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -28,11 +32,8 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 
-function money(n: number) {
-  return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
-}
-
 function DashboardPage() {
+  const [currency, setCurrency] = useState<Currency>("XCFA");
   useRealtimeInvalidate(
     "dashboard-live",
     ["attendance_events", "tasks", "expense_entries", "income_entries"],
@@ -44,47 +45,58 @@ function DashboardPage() {
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
   const chartFrom = subDays(today, 29);
+  const financeFrom = chartFrom < monthStart ? chartFrom : monthStart;
 
   const { data: profiles = [] } = useQuery({
     queryKey: ["dash-profiles"],
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name")).data ?? [],
+    queryFn: fetchActiveProfiles,
   });
   const { data: attToday = [] } = useQuery({
     queryKey: ["dash-att-today"],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("attendance_events")
-          .select("user_id, event_type, event_at")
-          .gte("event_at", startOfDay(today).toISOString())
-          .lte("event_at", endOfDay(today).toISOString())
-      ).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("attendance_events")
+        .select("user_id, event_type, event_at")
+        .gte("event_at", startOfDay(today).toISOString())
+        .lte("event_at", endOfDay(today).toISOString());
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: tasks = [] } = useQuery({
     queryKey: ["dash-tasks"],
-    queryFn: async () =>
-      (await supabase.from("tasks").select("id, status, deadline, completed_at, assigned_to"))
-        .data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("id, status, deadline, completed_at, assigned_to");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: incomes = [] } = useQuery({
-    queryKey: ["dash-incomes"],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("income_entries")
-          .select("amount, entry_date")
-          .gte("entry_date", format(chartFrom, "yyyy-MM-dd"))
-      ).data ?? [],
+    queryKey: ["dash-incomes", currency],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("income_entries")
+        .select("amount, entry_date")
+        .eq("currency", currency)
+        .gte("entry_date", format(financeFrom, "yyyy-MM-dd"));
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: expenses = [] } = useQuery({
-    queryKey: ["dash-expenses"],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("expense_entries")
-          .select("amount, entry_date")
-          .gte("entry_date", format(chartFrom, "yyyy-MM-dd"))
-      ).data ?? [],
+    queryKey: ["dash-expenses", currency],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("expense_entries")
+        .select("amount, entry_date")
+        .eq("currency", currency)
+        .in("status", ["approved", "paid"])
+        .gte("entry_date", format(financeFrom, "yyyy-MM-dd"));
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
   const byUser = new Map<string, { event_type: AttendanceEventType; event_at: string }[]>();
@@ -114,16 +126,16 @@ function DashboardPage() {
   ).length;
 
   const inWeek = incomes
-    .filter((i) => new Date(i.entry_date) >= weekStart && new Date(i.entry_date) <= weekEnd)
+    .filter((i) => parseISO(i.entry_date) >= weekStart && parseISO(i.entry_date) <= weekEnd)
     .reduce((a, b) => a + Number(b.amount), 0);
   const outWeek = expenses
-    .filter((i) => new Date(i.entry_date) >= weekStart && new Date(i.entry_date) <= weekEnd)
+    .filter((i) => parseISO(i.entry_date) >= weekStart && parseISO(i.entry_date) <= weekEnd)
     .reduce((a, b) => a + Number(b.amount), 0);
   const inMonth = incomes
-    .filter((i) => new Date(i.entry_date) >= monthStart && new Date(i.entry_date) <= monthEnd)
+    .filter((i) => parseISO(i.entry_date) >= monthStart && parseISO(i.entry_date) <= monthEnd)
     .reduce((a, b) => a + Number(b.amount), 0);
   const outMonth = expenses
-    .filter((i) => new Date(i.entry_date) >= monthStart && new Date(i.entry_date) <= monthEnd)
+    .filter((i) => parseISO(i.entry_date) >= monthStart && parseISO(i.entry_date) <= monthEnd)
     .reduce((a, b) => a + Number(b.amount), 0);
 
   // build 30-day chart
@@ -171,16 +183,33 @@ function DashboardPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Finance
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Finance
+          </h2>
+          <div className="inline-flex rounded-md border border-border bg-muted/40 p-1">
+            {(["XCFA", "USD"] as Currency[]).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setCurrency(item)}
+                className={cn(
+                  "rounded px-3 py-1 text-xs font-bold transition-colors",
+                  currency === item ? "bg-card text-foreground shadow" : "text-muted-foreground",
+                )}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card label="Week in" value={money(inWeek)} tone="working" mono />
-          <Card label="Week out" value={money(outWeek)} tone="absent" mono />
-          <Card label="Month in" value={money(inMonth)} tone="working" mono />
+          <Card label="Week in" value={formatMoney(inWeek, currency)} tone="working" mono />
+          <Card label="Week out" value={formatMoney(outWeek, currency)} tone="absent" mono />
+          <Card label="Month in" value={formatMoney(inMonth, currency)} tone="working" mono />
           <Card
             label="Month profit"
-            value={money(inMonth - outMonth)}
+            value={formatMoney(inMonth - outMonth, currency)}
             tone={inMonth - outMonth >= 0 ? "working" : "absent"}
             mono
           />
@@ -219,6 +248,7 @@ function DashboardPage() {
                     border: "1px solid var(--border)",
                     borderRadius: 8,
                   }}
+                  formatter={(value: number) => formatMoney(value, currency)}
                 />
                 <Area
                   type="monotone"

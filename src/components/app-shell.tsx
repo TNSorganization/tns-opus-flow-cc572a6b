@@ -15,7 +15,6 @@ import {
   Menu,
   X,
   Bell,
-  Search,
   Moon,
   Sun,
   Users2,
@@ -86,11 +85,12 @@ function useBadges(enabled: boolean) {
     queryKey: ["badge-tasks-overdue"],
     enabled,
     queryFn: async () => {
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from("tasks")
         .select("id", { count: "exact", head: true })
         .lt("deadline", new Date().toISOString())
         .not("status", "in", "(completed,cancelled)");
+      if (error) throw error;
       return count ?? 0;
     },
     refetchInterval: 60_000,
@@ -99,10 +99,11 @@ function useBadges(enabled: boolean) {
     queryKey: ["badge-expenses-pending"],
     enabled,
     queryFn: async () => {
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from("expense_entries")
         .select("id", { count: "exact", head: true })
         .eq("status", "pending");
+      if (error) throw error;
       return count ?? 0;
     },
     refetchInterval: 60_000,
@@ -119,18 +120,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { data: isActive } = useIsActive();
   const { data: me } = useCurrentRoles();
   const active = !!isActive;
+  const locked = isActive === false;
   const badges = useBadges(active);
 
   const { data: profile } = useQuery({
     queryKey: ["me-profile"],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
       if (!u.user) return null;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, email, avatar_url")
         .eq("id", u.user.id)
         .maybeSingle();
+      if (error) throw error;
       return data;
     },
   });
@@ -142,15 +146,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Redirect to /settings when locked and trying to access a restricted route.
   useEffect(() => {
     if (isActive === undefined) return;
-    if (!active && !UNLOCKED_ROUTES.has(pathname)) {
+    if (locked && !UNLOCKED_ROUTES.has(pathname)) {
       navigate({ to: "/settings", replace: true });
     }
-  }, [isActive, active, pathname, navigate]);
+  }, [isActive, locked, pathname, navigate]);
 
   async function signOut() {
     await qc.cancelQueries();
+    const { error } = await supabase.auth.signOut();
+    if (error) return toast.error(error.message);
     qc.clear();
-    await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
   }
 
@@ -164,7 +169,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="fixed hidden h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
-        <SidebarInner pathname={pathname} badges={badges} locked={!active} />
+        <SidebarInner pathname={pathname} badges={badges} locked={locked} />
         <SidebarFooter profile={profile} initials={initials} onSignOut={signOut} />
       </aside>
 
@@ -180,7 +185,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <SidebarInner pathname={pathname} badges={badges} locked={!active} />
+            <SidebarInner pathname={pathname} badges={badges} locked={locked} />
             <SidebarFooter profile={profile} initials={initials} onSignOut={signOut} />
           </aside>
         </div>
@@ -200,21 +205,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
               {titleFor(pathname)}
             </h1>
-            {!active && (
+            {locked && (
               <span className="hidden items-center gap-1 rounded-full bg-brand-danger/15 px-2 py-0.5 text-[11px] font-bold text-brand-danger sm:inline-flex">
                 <ShieldAlert className="h-3 w-3" /> Locked
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative hidden md:block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search…"
-                className="h-9 w-72 rounded-md border border-border bg-muted/40 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
             <Button size="icon" variant="outline" onClick={toggle} title="Toggle theme">
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
@@ -235,11 +232,12 @@ function NotificationsBell({ canSee }: { canSee: boolean }) {
     queryKey: ["my-notifications"],
     enabled: canSee,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("notifications")
         .select("id, title, body, category, hide_after, read_at, created_at")
         .order("created_at", { ascending: false })
         .limit(30);
+      if (error) throw error;
       const now = new Date();
       return (data ?? []).filter((n) => !n.hide_after || new Date(n.hide_after) > now);
     },
@@ -259,16 +257,21 @@ function NotificationsBell({ canSee }: { canSee: boolean }) {
   }, [qc, canSee]);
   const unread = notes.filter((n) => !n.read_at).length;
   async function markRead(id: string) {
-    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["my-notifications"] });
   }
   async function markAllRead() {
     const ids = notes.filter((n) => !n.read_at).map((n) => n.id);
     if (!ids.length) return;
-    await supabase
+    const { error } = await supabase
       .from("notifications")
       .update({ read_at: new Date().toISOString() })
       .in("id", ids);
+    if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["my-notifications"] });
     toast.success("Marked all as read");
   }

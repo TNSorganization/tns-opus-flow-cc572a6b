@@ -34,6 +34,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Audit dependencies
+        run: bun audit
+
       - name: Verify source
         run: |
           bun run lint
@@ -48,6 +51,10 @@ jobs:
         run: |
           test -f dist/client/index.html
           cp dist/client/index.html dist/client/404.html
+          for route in auth forgot-password reset-password dashboard home board tasks performance income expenses salary reports documents sops profile settings; do
+            mkdir -p "dist/client/$route"
+            cp dist/client/index.html "dist/client/$route/index.html"
+          done
           touch dist/client/.nojekyll
 
       - name: Configure GitHub Pages

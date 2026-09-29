@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { subDays } from "date-fns";
+import { format, subDays } from "date-fns";
 import { Trophy, TrendingDown, TrendingUp, Clock } from "lucide-react";
 import { KpiCard, SectionHeader } from "@/components/kpi-card";
 import { cn } from "@/lib/utils";
+import { fetchActiveProfiles } from "@/lib/profiles";
 
 export const Route = createFileRoute("/_authenticated/performance")({
   component: PerformancePage,
@@ -15,7 +16,7 @@ type Row = {
   name: string;
   attendance: number;
   completion: number;
-  deadline: number;
+  deadline: number | null;
   score: number;
 };
 
@@ -24,35 +25,38 @@ function PerformancePage() {
 
   const { data: profiles = [] } = useQuery({
     queryKey: ["perf-profiles"],
-    queryFn: async () =>
-      (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
+    queryFn: fetchActiveProfiles,
   });
   const { data: att = [] } = useQuery({
     queryKey: ["perf-att", from],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("attendance_events")
-          .select("user_id, event_type, event_at")
-          .gte("event_at", from)
-      ).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("attendance_events")
+        .select("user_id, event_type, event_at")
+        .gte("event_at", from);
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: tasks = [] } = useQuery({
     queryKey: ["perf-tasks", from],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("tasks")
-          .select("assigned_to, status, deadline, completed_at")
-          .gte("created_at", from)
-      ).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("assigned_to, status, deadline, completed_at")
+        .gte("created_at", from);
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
   // Total working days = distinct days ANY employee checked in during the window.
   // Fallback to elapsed days if nothing recorded yet.
   const workingDays = (() => {
     const s = new Set(
-      att.filter((e) => e.event_type === "check_in").map((e) => e.event_at.slice(0, 10)),
+      att
+        .filter((e) => e.event_type === "check_in")
+        .map((e) => format(new Date(e.event_at), "yyyy-MM-dd")),
     );
     return Math.max(s.size, 1);
   })();
@@ -62,7 +66,7 @@ function PerformancePage() {
       const daysPresent = new Set(
         att
           .filter((e) => e.user_id === p.id && e.event_type === "check_in")
-          .map((e) => e.event_at.slice(0, 10)),
+          .map((e) => format(new Date(e.event_at), "yyyy-MM-dd")),
       ).size;
       const attendance = Math.min(100, Math.round((daysPresent / workingDays) * 100));
       const my = tasks.filter((t) => t.assigned_to === p.id);
@@ -70,11 +74,18 @@ function PerformancePage() {
       const done = my.filter((t) => t.status === "completed" || t.status === "submitted");
       const validated = my.filter((t) => t.status === "completed");
       const completion = my.length ? Math.round((done.length / my.length) * 100) : 0;
-      const onTime = validated.filter(
-        (t) => t.completed_at && t.deadline && new Date(t.completed_at) <= new Date(t.deadline),
+      const deadlineTasks = validated.filter((task) => task.completed_at && task.deadline);
+      const onTime = deadlineTasks.filter(
+        (task) => new Date(task.completed_at!) <= new Date(task.deadline!),
       );
-      const deadline = validated.length ? Math.round((onTime.length / validated.length) * 100) : 0;
-      const score = Math.round(attendance * 0.4 + completion * 0.4 + deadline * 0.2);
+      const deadline = deadlineTasks.length
+        ? Math.round((onTime.length / deadlineTasks.length) * 100)
+        : null;
+      const score = Math.round(
+        deadline === null
+          ? attendance * 0.5 + completion * 0.5
+          : attendance * 0.4 + completion * 0.4 + deadline * 0.2,
+      );
       return {
         id: p.id,
         name: p.full_name || p.email || "—",
@@ -179,15 +190,17 @@ function PerformancePage() {
   );
 }
 
-function Bar({ v, tone }: { v: number; tone: "info" | "success" | "purple" }) {
+function Bar({ v, tone }: { v: number | null; tone: "info" | "success" | "purple" }) {
   const color =
     tone === "info" ? "bg-brand-info" : tone === "success" ? "bg-brand-success" : "bg-brand-purple";
   return (
     <div className="flex items-center gap-2">
       <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-        <div className={cn("h-full", color)} style={{ width: `${v}%` }} />
+        <div className={cn("h-full", color)} style={{ width: `${v ?? 0}%` }} />
       </div>
-      <span className="kpi-number text-xs text-muted-foreground">{v}%</span>
+      <span className="kpi-number text-xs text-muted-foreground">
+        {v === null ? "N/A" : `${v}%`}
+      </span>
     </div>
   );
 }

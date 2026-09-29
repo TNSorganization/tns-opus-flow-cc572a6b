@@ -6,7 +6,8 @@ import { getPendingMatricule } from "@/lib/pending-matricule";
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async ({ location }) => {
-    const { data } = await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getUser();
+    if (error) throw error;
     if (!data.user) throw redirect({ to: "/auth" });
 
     const pendingMatricule = getPendingMatricule(data.user.email);

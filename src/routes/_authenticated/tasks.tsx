@@ -24,10 +24,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Loader2, CheckCircle2, Send, ShieldCheck } from "lucide-react";
-import { format, isPast } from "date-fns";
+import { endOfDay, format, isPast, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
+import { isMissingRpcError } from "@/lib/supabase-errors";
+import { fetchActiveProfiles } from "@/lib/profiles";
 
 type TaskStatus = Database["public"]["Enums"]["task_status"];
 type TaskPriority = Database["public"]["Enums"]["task_priority"];
@@ -35,8 +37,11 @@ type TaskPriority = Database["public"]["Enums"]["task_priority"];
 const STATUSES: { key: TaskStatus; label: string }[] = [
   { key: "not_started", label: "Not Started" },
   { key: "in_progress", label: "In Progress" },
+  { key: "waiting", label: "Waiting" },
+  { key: "overdue", label: "Overdue" },
   { key: "submitted", label: "Awaiting Validation" },
   { key: "completed", label: "Completed" },
+  { key: "cancelled", label: "Cancelled" },
 ];
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 const PRIORITY_TONE: Record<TaskPriority, string> = {
@@ -78,8 +83,7 @@ function TasksPage() {
 
   const { data: people = [] } = useQuery({
     queryKey: ["people"],
-    queryFn: async () =>
-      (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
+    queryFn: fetchActiveProfiles,
   });
 
   const nameOf = (id: string | null) => {
@@ -88,11 +92,33 @@ function TasksPage() {
   };
 
   const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: TaskStatus }) => {
+    mutationFn: async ({
+      id,
+      status,
+      previousStatus,
+    }: {
+      id: string;
+      status: TaskStatus;
+      previousStatus: TaskStatus;
+    }) => {
+      const { error: rpcError } = await supabase.rpc("set_task_status", {
+        _status: status,
+        _task_id: id,
+      });
+      if (!rpcError) return;
+      if (!isMissingRpcError(rpcError)) throw rpcError;
+
+      // Keep the current backend usable until the hardening migration is applied.
       const patch =
         status === "completed"
           ? { status, completed_at: new Date().toISOString(), progress: 100 }
-          : { status };
+          : {
+              status,
+              completed_at: null,
+              ...(status === "not_started" || previousStatus === "completed"
+                ? { progress: 0 }
+                : {}),
+            };
       const { error } = await supabase.from("tasks").update(patch).eq("id", id);
       if (error) throw error;
     },
@@ -129,7 +155,7 @@ function TasksPage() {
       {isLoading ? (
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {STATUSES.map((col) => {
             const items = tasks.filter((t) => t.status === col.key);
             return (
@@ -146,7 +172,10 @@ function TasksPage() {
                   ) : (
                     items.map((t) => {
                       const overdue =
-                        t.deadline && isPast(new Date(t.deadline)) && t.status !== "completed";
+                        t.deadline &&
+                        isPast(new Date(t.deadline)) &&
+                        t.status !== "completed" &&
+                        t.status !== "cancelled";
                       const mine = t.assigned_to === me?.userId;
                       return (
                         <div
@@ -188,7 +217,14 @@ function TasksPage() {
                             task={t}
                             mine={mine}
                             canValidate={canValidate}
-                            onMove={(s) => updateStatus.mutate({ id: t.id, status: s })}
+                            disabled={updateStatus.isPending}
+                            onMove={(s) =>
+                              updateStatus.mutate({
+                                id: t.id,
+                                status: s,
+                                previousStatus: t.status,
+                              })
+                            }
                           />
                         </div>
                       );
@@ -208,11 +244,13 @@ function TaskActions({
   task,
   mine,
   canValidate,
+  disabled,
   onMove,
 }: {
   task: { status: TaskStatus };
   mine: boolean;
   canValidate: boolean;
+  disabled: boolean;
   onMove: (s: TaskStatus) => void;
 }) {
   const s = task.status;
@@ -223,20 +261,38 @@ function TaskActions({
           size="sm"
           variant="secondary"
           className="h-7 text-xs"
+          disabled={disabled}
           onClick={() => onMove("in_progress")}
         >
           Start
         </Button>
       )}
       {mine && s === "in_progress" && (
-        <Button size="sm" className="h-7 text-xs" onClick={() => onMove("submitted")}>
+        <Button
+          size="sm"
+          className="h-7 text-xs"
+          disabled={disabled}
+          onClick={() => onMove("submitted")}
+        >
           <Send className="mr-1 h-3 w-3" /> Submit
+        </Button>
+      )}
+      {mine && (s === "waiting" || s === "overdue") && (
+        <Button
+          size="sm"
+          variant="secondary"
+          className="h-7 text-xs"
+          disabled={disabled}
+          onClick={() => onMove("in_progress")}
+        >
+          Resume
         </Button>
       )}
       {canValidate && s === "submitted" && (
         <Button
           size="sm"
           className="h-7 bg-brand-success text-xs hover:bg-brand-success/90"
+          disabled={disabled}
           onClick={() => onMove("completed")}
         >
           <ShieldCheck className="mr-1 h-3 w-3" /> Validate
@@ -247,26 +303,29 @@ function TaskActions({
           size="sm"
           variant="outline"
           className="h-7 text-xs"
+          disabled={disabled}
           onClick={() => onMove("in_progress")}
         >
           Reject
         </Button>
       )}
-      {canValidate && s !== "completed" && s !== "submitted" && (
+      {canValidate && s !== "completed" && s !== "submitted" && s !== "cancelled" && (
         <Button
           size="sm"
           variant="ghost"
           className="h-7 text-xs text-brand-success"
+          disabled={disabled}
           onClick={() => onMove("completed")}
         >
           <CheckCircle2 className="mr-1 h-3 w-3" /> Mark done
         </Button>
       )}
-      {canValidate && s === "completed" && (
+      {canValidate && (s === "completed" || s === "cancelled") && (
         <Button
           size="sm"
           variant="ghost"
           className="h-7 text-xs"
+          disabled={disabled}
           onClick={() => onMove("in_progress")}
         >
           Reopen
@@ -289,14 +348,19 @@ function NewTaskDialog({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     setLoading(true);
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u, error: userError } = await supabase.auth.getUser();
+    if (userError || !u.user) {
+      setLoading(false);
+      return toast.error(userError?.message || "Not signed in");
+    }
+    const deadline = String(fd.get("deadline") || "");
     const { error } = await supabase.from("tasks").insert({
       title: String(fd.get("title")),
       description: String(fd.get("description") || "") || null,
       priority: (fd.get("priority") as TaskPriority) || "medium",
-      deadline: fd.get("deadline") ? new Date(String(fd.get("deadline"))).toISOString() : null,
+      deadline: deadline ? endOfDay(parseISO(deadline)).toISOString() : null,
       assigned_to: (fd.get("assigned_to") as string) || null,
-      assigned_by: u.user?.id,
+      assigned_by: u.user.id,
     });
     setLoading(false);
     if (error) return toast.error(error.message);

@@ -25,17 +25,25 @@ import { Plus, Loader2, BookOpen, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { SectionHeader } from "@/components/kpi-card";
+import { isManager, useCurrentRoles } from "@/hooks/use-current-role";
 
 export const Route = createFileRoute("/_authenticated/sops")({
   component: SopsPage,
 });
 
 function SopsPage() {
+  const { data: me } = useCurrentRoles();
+  const canManage = isManager(me?.roles ?? []);
   const { data: items = [] } = useQuery({
     queryKey: ["sops"],
-    queryFn: async () =>
-      (await supabase.from("sops").select("*").order("created_at", { ascending: false })).data ??
-      [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sops")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
   const sops = items.filter((i) => i.kind === "sop");
@@ -44,7 +52,13 @@ function SopsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <NewButton />
+        {canManage ? (
+          <NewButton />
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            SOPs and policies are managed by Operations and administration.
+          </p>
+        )}
       </div>
 
       <div>
@@ -137,14 +151,18 @@ function NewButton() {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     setLoading(true);
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u, error: userError } = await supabase.auth.getUser();
+    if (userError || !u.user) {
+      setLoading(false);
+      return toast.error(userError?.message || "Not signed in");
+    }
     const { error } = await supabase.from("sops").insert({
       kind: String(fd.get("kind")),
       title: String(fd.get("title")),
       content: String(fd.get("content") || ""),
       version: String(fd.get("version") || "1.0"),
       status: "active",
-      owner_id: u.user?.id,
+      owner_id: u.user.id,
     });
     setLoading(false);
     if (error) return toast.error(error.message);

@@ -38,11 +38,12 @@ import {
   endOfWeek,
   startOfMonth,
   endOfMonth,
+  parseISO,
   subDays,
 } from "date-fns";
 import { toast } from "sonner";
 import { KpiCard, SectionHeader } from "@/components/kpi-card";
-import { formatMoney, type Currency } from "@/lib/currency";
+import { formatMoney, formatMoneyFull, type Currency } from "@/lib/currency";
 import {
   ResponsiveContainer,
   PieChart,
@@ -56,6 +57,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { useCurrentRoles, isFinance as isFin } from "@/hooks/use-current-role";
+import { fetchActiveProfiles } from "@/lib/profiles";
 
 export const Route = createFileRoute("/_authenticated/income")({
   component: IncomePage,
@@ -97,24 +99,35 @@ function IncomePage() {
 
   const { data: sources = [] } = useQuery({
     queryKey: ["income-sources"],
-    queryFn: async () =>
-      (await supabase.from("income_sources").select("*").eq("active", true).order("name")).data ??
-      [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("income_sources")
+        .select("*")
+        .eq("active", true)
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: methods = [] } = useQuery({
     queryKey: ["payment-methods"],
-    queryFn: async () =>
-      (await supabase.from("payment_methods").select("*").eq("active", true).order("name")).data ??
-      [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("payment_methods")
+        .select("*")
+        .eq("active", true)
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-min"],
-    queryFn: async () =>
-      (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
+    queryFn: fetchActiveProfiles,
   });
 
   const inRange = (d: string, from: Date, to: Date) => {
-    const x = new Date(d);
+    const x = parseISO(d);
     return x >= from && x <= to;
   };
   const sumRange = (from: Date, to: Date) =>
@@ -303,13 +316,13 @@ function IncomePage() {
               ) : (
                 rows.slice(0, 50).map((r) => (
                   <tr key={r.id} className="border-b border-border/60 hover:bg-muted/30">
-                    <td className="px-4 py-3">{format(new Date(r.entry_date), "d MMM yyyy")}</td>
+                    <td className="px-4 py-3">{format(parseISO(r.entry_date), "d MMM yyyy")}</td>
                     <td className="px-4 py-3">
                       {sources.find((s) => s.id === r.source_id)?.name || "—"}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{r.description || "—"}</td>
                     <td className="px-4 py-3 text-right font-semibold kpi-number text-brand-success">
-                      +{formatMoney(Number(r.amount), currency)}
+                      +{formatMoneyFull(Number(r.amount), currency)}
                     </td>
                     <td className="px-4 py-3">
                       {methods.find((m) => m.id === r.payment_method_id)?.name || "—"}
@@ -372,17 +385,25 @@ function NewIncomeButton({
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const amount = Number(fd.get("amount"));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return toast.error("Amount must be greater than zero");
+    }
     setLoading(true);
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u, error: userError } = await supabase.auth.getUser();
+    if (userError || !u.user) {
+      setLoading(false);
+      return toast.error(userError?.message || "Not signed in");
+    }
     const { error } = await supabase.from("income_entries").insert({
       entry_date: String(fd.get("entry_date")),
-      amount: Number(fd.get("amount")),
+      amount,
       currency: String(fd.get("currency")),
       description: String(fd.get("description") || "") || null,
       source_id: (fd.get("source_id") as string) || null,
       payment_method_id: (fd.get("payment_method_id") as string) || null,
       reference: String(fd.get("reference") || "") || null,
-      created_by: u.user?.id,
+      created_by: u.user.id,
     });
     setLoading(false);
     if (error) return toast.error(error.message);
@@ -415,7 +436,7 @@ function NewIncomeButton({
             </div>
             <div className="space-y-1.5">
               <Label>Amount</Label>
-              <Input name="amount" type="number" step="0.01" min="0" required />
+              <Input name="amount" type="number" step="0.01" min="0.01" required />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">

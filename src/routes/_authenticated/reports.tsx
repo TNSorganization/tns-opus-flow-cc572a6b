@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/select";
 import {
   format,
+  isValid,
+  parseISO,
   startOfDay,
   endOfDay,
   startOfWeek,
@@ -22,6 +24,8 @@ import {
   endOfMonth,
 } from "date-fns";
 import { Download } from "lucide-react";
+import { toast } from "sonner";
+import { formatMoneyFull, type Currency } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated/reports")({
   component: ReportsPage,
@@ -31,6 +35,7 @@ type Preset = "today" | "week" | "month" | "custom";
 
 function ReportsPage() {
   const [preset, setPreset] = useState<Preset>("month");
+  const [currency, setCurrency] = useState<Currency>("XCFA");
   const [from, setFrom] = useState<string>(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [to, setTo] = useState<string>(format(endOfMonth(new Date()), "yyyy-MM-dd"));
 
@@ -43,73 +48,88 @@ function ReportsPage() {
         to: endOfWeek(now, { weekStartsOn: 1 }),
       };
     if (preset === "month") return { from: startOfMonth(now), to: endOfMonth(now) };
-    return { from: startOfDay(new Date(from)), to: endOfDay(new Date(to)) };
+    const customFrom = parseISO(from);
+    const customTo = parseISO(to);
+    return {
+      from: startOfDay(isValid(customFrom) ? customFrom : now),
+      to: endOfDay(isValid(customTo) ? customTo : now),
+    };
   }, [preset, from, to]);
 
   const { data: att = [] } = useQuery({
     queryKey: ["report-att", range.from.toISOString(), range.to.toISOString()],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("attendance_events")
-          .select("user_id, event_type, event_at")
-          .gte("event_at", range.from.toISOString())
-          .lte("event_at", range.to.toISOString())
-      ).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("attendance_events")
+        .select("user_id, event_type, event_at")
+        .gte("event_at", range.from.toISOString())
+        .lte("event_at", range.to.toISOString());
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: inc = [] } = useQuery({
-    queryKey: ["report-inc", range.from.toISOString(), range.to.toISOString()],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("income_entries")
-          .select("entry_date, amount, description, reference")
-          .gte("entry_date", format(range.from, "yyyy-MM-dd"))
-          .lte("entry_date", format(range.to, "yyyy-MM-dd"))
-      ).data ?? [],
+    queryKey: ["report-inc", currency, range.from.toISOString(), range.to.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("income_entries")
+        .select("entry_date, amount, currency, description, reference")
+        .eq("currency", currency)
+        .gte("entry_date", format(range.from, "yyyy-MM-dd"))
+        .lte("entry_date", format(range.to, "yyyy-MM-dd"));
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: exp = [] } = useQuery({
-    queryKey: ["report-exp", range.from.toISOString(), range.to.toISOString()],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("expense_entries")
-          .select("entry_date, amount, purpose, reference, status")
-          .gte("entry_date", format(range.from, "yyyy-MM-dd"))
-          .lte("entry_date", format(range.to, "yyyy-MM-dd"))
-      ).data ?? [],
+    queryKey: ["report-exp", currency, range.from.toISOString(), range.to.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("expense_entries")
+        .select("entry_date, amount, currency, purpose, reference, status")
+        .eq("currency", currency)
+        .gte("entry_date", format(range.from, "yyyy-MM-dd"))
+        .lte("entry_date", format(range.to, "yyyy-MM-dd"));
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: tasks = [] } = useQuery({
     queryKey: ["report-tasks", range.from.toISOString(), range.to.toISOString()],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("tasks")
-          .select("title, status, priority, deadline, completed_at, assigned_to")
-          .gte("created_at", range.from.toISOString())
-          .lte("created_at", range.to.toISOString())
-      ).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("title, status, priority, deadline, completed_at, assigned_to")
+        .gte("created_at", range.from.toISOString())
+        .lte("created_at", range.to.toISOString());
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
+  const postedExp = exp.filter((row) => row.status === "approved" || row.status === "paid");
   const totalIn = inc.reduce((a, b) => a + Number(b.amount), 0);
-  const totalOut = exp.reduce((a, b) => a + Number(b.amount), 0);
+  const totalOut = postedExp.reduce((a, b) => a + Number(b.amount), 0);
 
   function download(name: string, rows: Record<string, unknown>[]) {
-    if (!rows.length) return;
+    if (!rows.length) return toast.info("There is no data to export for this period.");
     const keys = Object.keys(rows[0]);
     const escape = (v: unknown) => {
-      const s = v == null ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      let value = v == null ? "" : String(v);
+      if (/^[\t\r ]*[=+\-@]/.test(value)) value = `'${value}`;
+      return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
     };
     const csv = [keys.join(","), ...rows.map((r) => keys.map((k) => escape(r[k])).join(","))].join(
       "\n",
     );
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `${name}-${format(range.from, "yyyy-MM-dd")}_${format(range.to, "yyyy-MM-dd")}.csv`;
+    document.body.appendChild(a);
     a.click();
+    a.remove();
     URL.revokeObjectURL(url);
   }
 
@@ -139,14 +159,38 @@ function ReportsPage() {
           <>
             <div className="space-y-1.5">
               <Label>From</Label>
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              <Input
+                type="date"
+                value={from}
+                max={to}
+                onChange={(e) => setFrom(e.target.value)}
+                required
+              />
             </div>
             <div className="space-y-1.5">
               <Label>To</Label>
-              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+              <Input
+                type="date"
+                value={to}
+                min={from}
+                onChange={(e) => setTo(e.target.value)}
+                required
+              />
             </div>
           </>
         )}
+        <div className="min-w-28 space-y-1.5">
+          <Label>Currency</Label>
+          <Select value={currency} onValueChange={(value) => setCurrency(value as Currency)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="XCFA">XCFA</SelectItem>
+              <SelectItem value="USD">USD</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="text-xs text-muted-foreground">
           {format(range.from, "d MMM yyyy")} → {format(range.to, "d MMM yyyy")}
         </div>
@@ -159,8 +203,8 @@ function ReportsPage() {
         <Stat label="Tasks in period" value={tasks.length} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Stat label="Total income" value={totalIn.toLocaleString()} mono tone="in" />
-        <Stat label="Total expenses" value={totalOut.toLocaleString()} mono tone="out" />
+        <Stat label="Total income" value={formatMoneyFull(totalIn, currency)} mono tone="in" />
+        <Stat label="Posted expenses" value={formatMoneyFull(totalOut, currency)} mono tone="out" />
       </div>
 
       <div className="surface p-4">
@@ -169,10 +213,10 @@ function ReportsPage() {
           <Button variant="outline" onClick={() => download("attendance", att)}>
             <Download className="mr-1.5 h-4 w-4" /> Attendance CSV
           </Button>
-          <Button variant="outline" onClick={() => download("income", inc)}>
+          <Button variant="outline" onClick={() => download(`income-${currency}`, inc)}>
             <Download className="mr-1.5 h-4 w-4" /> Income CSV
           </Button>
-          <Button variant="outline" onClick={() => download("expenses", exp)}>
+          <Button variant="outline" onClick={() => download(`expenses-${currency}`, exp)}>
             <Download className="mr-1.5 h-4 w-4" /> Expenses CSV
           </Button>
           <Button variant="outline" onClick={() => download("tasks", tasks)}>

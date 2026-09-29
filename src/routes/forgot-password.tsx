@@ -20,8 +20,9 @@ function ForgotPasswordPage() {
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
+    const email = String(form.get("email")).trim().toLowerCase();
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(String(form.get("email")), {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: getAppUrl("reset-password"),
     });
     setLoading(false);
@@ -44,7 +45,7 @@ function ForgotPasswordPage() {
           <form onSubmit={submit} className="mt-6 space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" required />
+              <Input id="email" name="email" type="email" required autoComplete="email" />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               Send reset link

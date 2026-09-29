@@ -6,6 +6,7 @@ import { deriveStatus, type AttendanceEventType } from "@/lib/attendance";
 import { startOfDay, endOfDay, formatDistanceToNowStrict } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { fetchActiveProfiles } from "@/lib/profiles";
 
 export const Route = createFileRoute("/_authenticated/board")({
   component: BoardPage,
@@ -29,13 +30,7 @@ function BoardPage() {
   const today = new Date();
   const { data: profiles = [] } = useQuery({
     queryKey: ["all-profiles"],
-    queryFn: async (): Promise<Row[]> => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, avatar_url");
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async (): Promise<Row[]> => fetchActiveProfiles(),
   });
 
   const { data: events = [] } = useQuery({

@@ -15,6 +15,7 @@ import {
   normalizeMatriculeCode,
   savePendingMatricule,
 } from "@/lib/pending-matricule";
+import { isMissingRpcError } from "@/lib/supabase-errors";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -44,6 +45,7 @@ function authErrorMessage(message: string) {
 function AuthPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [checking, setChecking] = useState(true);
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
 
@@ -78,6 +80,9 @@ function AuthPage() {
     });
     if (error) {
       setLoading(false);
+      if (error.message.toLowerCase().includes("email not confirmed")) {
+        setConfirmationEmail(email);
+      }
       return toast.error(authErrorMessage(error.message));
     }
     setLoading(false);
@@ -96,20 +101,40 @@ function AuthPage() {
     setLoading(true);
 
     if (matricule) {
-      const { data: m, error: mErr } = await supabase
-        .from("matricules")
-        .select("id, used_by, expires_at")
-        .eq("code", matricule)
-        .maybeSingle();
-      if (mErr) {
+      const { data: isValid, error: validationError } = await supabase.rpc("validate_matricule", {
+        _code: matricule,
+        _email: email,
+      });
+
+      let valid = isValid === true;
+      if (validationError && isMissingRpcError(validationError)) {
+        // Compatibility path for deployments that have not applied the hardening migration yet.
+        const { data: legacyMatricule, error: legacyError } = await supabase
+          .from("matricules")
+          .select("id, used_by, expires_at, email")
+          .eq("code", matricule)
+          .maybeSingle();
+        if (legacyError) {
+          setLoading(false);
+          return toast.error(
+            "We couldn't verify the matricule. Check your connection and try again.",
+          );
+        }
+        valid =
+          !!legacyMatricule &&
+          !legacyMatricule.used_by &&
+          (!legacyMatricule.expires_at || new Date(legacyMatricule.expires_at) >= new Date()) &&
+          (!legacyMatricule.email || legacyMatricule.email.trim().toLowerCase() === email);
+      } else if (validationError) {
         setLoading(false);
         return toast.error(
           "We couldn't verify the matricule. Check your connection and try again.",
         );
       }
-      if (!m || m.used_by || (m.expires_at && new Date(m.expires_at) < new Date())) {
+
+      if (!valid) {
         setLoading(false);
-        return toast.error("Invalid or already-used matricule");
+        return toast.error("This matricule is invalid, expired, used, or issued to another email.");
       }
       savePendingMatricule(matricule, email);
     }
@@ -142,6 +167,19 @@ function AuthPage() {
       setConfirmationEmail(email);
       toast.success("Account created. Check your inbox to confirm your email.");
     }
+  }
+
+  async function resendConfirmation() {
+    if (!confirmationEmail) return;
+    setResending(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: confirmationEmail,
+      options: { emailRedirectTo: getAppUrl() },
+    });
+    setResending(false);
+    if (error) return toast.error(authErrorMessage(error.message));
+    toast.success("A new confirmation email was sent.");
   }
 
   if (checking) {
@@ -179,6 +217,16 @@ function AuthPage() {
                 Open the link sent to {confirmationEmail}. After confirmation, we'll bring you back
                 to activate your matricule.
               </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-3"
+                disabled={resending}
+                onClick={resendConfirmation}
+              >
+                {resending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Resend email"}
+              </Button>
             </div>
           )}
 

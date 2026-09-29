@@ -5,6 +5,7 @@ import { formatMoneyFull } from "@/lib/currency";
 import { format } from "date-fns";
 import { Wallet } from "lucide-react";
 import { useCurrentRoles, isFinance as isFin } from "@/hooks/use-current-role";
+import { fetchActiveProfiles } from "@/lib/profiles";
 
 export const Route = createFileRoute("/_authenticated/salary")({
   component: SalaryPage,
@@ -18,11 +19,12 @@ function SalaryPage() {
     queryKey: ["my-salary", me?.userId],
     enabled: !!me?.userId,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("salaries")
         .select("amount, currency, updated_at")
         .eq("user_id", me!.userId!)
         .maybeSingle();
+      if (error) throw error;
       return data;
     },
   });
@@ -30,35 +32,36 @@ function SalaryPage() {
   const { data: myPayments = [] } = useQuery({
     queryKey: ["my-salary-payments", me?.userId],
     enabled: !!me?.userId,
-    queryFn: async () =>
-      (
-        await supabase
-          .from("salary_payments")
-          .select("id, amount, currency, period, paid_at, note")
-          .eq("user_id", me!.userId!)
-          .order("paid_at", { ascending: false })
-          .limit(24)
-      ).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("salary_payments")
+        .select("id, amount, currency, period, paid_at, note")
+        .eq("user_id", me!.userId!)
+        .order("paid_at", { ascending: false })
+        .limit(24);
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
   const { data: allPayments = [] } = useQuery({
     queryKey: ["all-salary-payments"],
     enabled: finance,
-    queryFn: async () =>
-      (
-        await supabase
-          .from("salary_payments")
-          .select("id, user_id, amount, currency, period, paid_at, note")
-          .order("paid_at", { ascending: false })
-          .limit(200)
-      ).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("salary_payments")
+        .select("id, user_id, amount, currency, period, paid_at, note")
+        .order("paid_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-min"],
     enabled: finance,
-    queryFn: async () =>
-      (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
+    queryFn: fetchActiveProfiles,
   });
 
   return (

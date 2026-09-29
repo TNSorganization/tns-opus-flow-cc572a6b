@@ -7,7 +7,7 @@ export function formatMoney(n: number, currency: Currency = "XCFA") {
       ? (n / 1_000_000).toFixed(abs >= 10_000_000 ? 1 : 2).replace(/\.0+$/, "") + "M"
       : abs >= 1_000
         ? (n / 1_000).toFixed(abs >= 10_000 ? 0 : 1).replace(/\.0+$/, "") + "K"
-        : n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        : n.toLocaleString(undefined, { maximumFractionDigits: currency === "USD" ? 2 : 0 });
   return currency === "USD" ? `$${compact}` : `₣${compact}`;
 }
 

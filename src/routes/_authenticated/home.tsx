@@ -50,7 +50,8 @@ function HomePage() {
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["attendance-today"],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
       if (!u.user) return [];
       const { data, error } = await supabase
         .from("attendance_events")
@@ -103,9 +104,7 @@ function HomePage() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {allActions.map((t) => {
-          // Check-in is always available (starts a new session or overrides).
-          // Others depend on current state.
-          const enabled = t === "check_in" ? true : state.next.includes(t);
+          const enabled = state.next.includes(t);
           const meta = LABELS[t];
           const Icon = meta.Icon;
           return (

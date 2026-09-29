@@ -35,12 +35,14 @@ import {
   endOfWeek,
   startOfMonth,
   endOfMonth,
+  parseISO,
   subDays,
 } from "date-fns";
 import { toast } from "sonner";
 import { KpiCard, SectionHeader } from "@/components/kpi-card";
-import { formatMoney, type Currency } from "@/lib/currency";
+import { formatMoney, formatMoneyFull, type Currency } from "@/lib/currency";
 import { cn } from "@/lib/utils";
+import { fetchActiveProfiles } from "@/lib/profiles";
 import {
   ResponsiveContainer,
   PieChart,
@@ -105,41 +107,58 @@ function ExpensesPage() {
     queryKey: ["cashflow-incomes", currency],
     queryFn: async () => {
       const from = format(subDays(today, 13), "yyyy-MM-dd");
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("income_entries")
         .select("entry_date, amount")
         .eq("currency", currency)
         .gte("entry_date", from);
+      if (error) throw error;
       return data ?? [];
     },
   });
 
   const { data: categories = [] } = useQuery({
     queryKey: ["expense-categories"],
-    queryFn: async () =>
-      (await supabase.from("expense_categories").select("*").eq("active", true).order("name"))
-        .data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("expense_categories")
+        .select("*")
+        .eq("active", true)
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: methods = [] } = useQuery({
     queryKey: ["payment-methods"],
-    queryFn: async () =>
-      (await supabase.from("payment_methods").select("*").eq("active", true).order("name")).data ??
-      [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("payment_methods")
+        .select("*")
+        .eq("active", true)
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
-    queryFn: async () => (await supabase.from("departments").select("*").order("name")).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("departments").select("*").order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-min"],
-    queryFn: async () =>
-      (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
+    queryFn: fetchActiveProfiles,
   });
 
+  const postedRows = rows.filter((row) => row.status === "approved" || row.status === "paid");
   const sumRange = (from: Date, to: Date) =>
-    rows
+    postedRows
       .filter((r) => {
-        const d = new Date(r.entry_date);
+        const d = parseISO(r.entry_date);
         return d >= from && d <= to;
       })
       .reduce((a, b) => a + Number(b.amount), 0);
@@ -152,7 +171,7 @@ function ExpensesPage() {
   const monthTotal = sumRange(startOfMonth(today), endOfMonth(today));
 
   const byDept = new Map<string, number>();
-  for (const r of rows) {
+  for (const r of postedRows) {
     const name = departments.find((d) => d.id === r.department_id)?.name || "Other";
     byDept.set(name, (byDept.get(name) ?? 0) + Number(r.amount));
   }
@@ -166,7 +185,9 @@ function ExpensesPage() {
     days.push({
       d: format(d, "d MMM"),
       income: incomes.filter((x) => x.entry_date === key).reduce((a, b) => a + Number(b.amount), 0),
-      expense: rows.filter((x) => x.entry_date === key).reduce((a, b) => a + Number(b.amount), 0),
+      expense: postedRows
+        .filter((x) => x.entry_date === key)
+        .reduce((a, b) => a + Number(b.amount), 0),
     });
   }
 
@@ -174,13 +195,14 @@ function ExpensesPage() {
 
   const approve = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u, error: userError } = await supabase.auth.getUser();
+      if (userError || !u.user) throw userError || new Error("Not signed in");
       const { error } = await supabase
         .from("expense_entries")
         .update({
           status,
-          approved_by: u.user?.id,
-          approved_at: new Date().toISOString(),
+          approved_by: status === "approved" ? u.user.id : null,
+          approved_at: status === "approved" ? new Date().toISOString() : null,
         })
         .eq("id", id);
       if (error) throw error;
@@ -338,7 +360,7 @@ function ExpensesPage() {
       </div>
 
       <div>
-        <SectionHeader title="Pending Approvals">
+        <SectionHeader title="Recent Expenses & Requests">
           {pending.length > 0 && (
             <span className="text-sm font-semibold text-brand-danger">
               {pending.length} require action
@@ -353,7 +375,7 @@ function ExpensesPage() {
                 <th className="px-4 py-3">Department</th>
                 <th className="px-4 py-3">Purpose</th>
                 <th className="px-4 py-3 text-right">Amount</th>
-                <th className="px-4 py-3">Paid By</th>
+                <th className="px-4 py-3">Created By</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
@@ -368,13 +390,13 @@ function ExpensesPage() {
               ) : (
                 rows.slice(0, 50).map((r) => (
                   <tr key={r.id} className="border-b border-border/60 hover:bg-muted/30">
-                    <td className="px-4 py-3">{format(new Date(r.entry_date), "d MMM yyyy")}</td>
+                    <td className="px-4 py-3">{format(parseISO(r.entry_date), "d MMM yyyy")}</td>
                     <td className="px-4 py-3">
                       {departments.find((d) => d.id === r.department_id)?.name || "—"}
                     </td>
                     <td className="px-4 py-3">{r.purpose}</td>
                     <td className="px-4 py-3 text-right font-semibold kpi-number text-brand-danger">
-                      −{formatMoney(Number(r.amount), currency)}
+                      −{formatMoneyFull(Number(r.amount), currency)}
                     </td>
                     <td className="px-4 py-3">{nameOf(r.created_by)}</td>
                     <td className="px-4 py-3">
@@ -387,6 +409,7 @@ function ExpensesPage() {
                             size="icon"
                             variant="outline"
                             className="h-7 w-7 text-brand-success"
+                            disabled={approve.isPending}
                             onClick={() => approve.mutate({ id: r.id, status: "approved" })}
                           >
                             <Check className="h-3.5 w-3.5" />
@@ -395,6 +418,7 @@ function ExpensesPage() {
                             size="icon"
                             variant="outline"
                             className="h-7 w-7 text-brand-danger"
+                            disabled={approve.isPending}
                             onClick={() => approve.mutate({ id: r.id, status: "rejected" })}
                           >
                             <X className="h-3.5 w-3.5" />
@@ -462,19 +486,30 @@ function NewExpenseButton({
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const amount = Number(fd.get("amount"));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return toast.error("Amount must be greater than zero");
+    }
     setLoading(true);
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u, error: userError } = await supabase.auth.getUser();
+    if (userError || !u.user) {
+      setLoading(false);
+      return toast.error(userError?.message || "Not signed in");
+    }
+    const recordedAt = new Date().toISOString();
     const { error } = await supabase.from("expense_entries").insert({
       entry_date: String(fd.get("entry_date")),
-      amount: Number(fd.get("amount")),
+      amount,
       currency: String(fd.get("currency")),
       purpose: String(fd.get("purpose")),
       category_id: (fd.get("category_id") as string) || null,
       department_id: (fd.get("department_id") as string) || null,
       payment_method_id: (fd.get("payment_method_id") as string) || null,
       reference: String(fd.get("reference") || "") || null,
-      status: "pending",
-      created_by: u.user?.id,
+      status: mode === "record" ? "approved" : "pending",
+      approved_by: mode === "record" ? u.user.id : null,
+      approved_at: mode === "record" ? recordedAt : null,
+      created_by: u.user.id,
     });
     setLoading(false);
     if (error) return toast.error(error.message);
@@ -510,7 +545,7 @@ function NewExpenseButton({
             </div>
             <div className="space-y-1.5">
               <Label>Amount</Label>
-              <Input name="amount" type="number" step="0.01" min="0" required />
+              <Input name="amount" type="number" step="0.01" min="0.01" required />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">

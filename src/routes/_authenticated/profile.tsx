@@ -18,18 +18,25 @@ function ProfilePage() {
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
+  const [avatarLoading, setAvatarLoading] = useState(false);
   const { data: me } = useCurrentRoles();
 
-  const { data: profile } = useQuery({
+  const {
+    data: profile,
+    isLoading,
+    error: profileError,
+  } = useQuery({
     queryKey: ["me-profile-full"],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
       if (!u.user) return null;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, email, avatar_url, department_id, job_title")
         .eq("id", u.user.id)
         .maybeSingle();
+      if (error) throw error;
       return data;
     },
   });
@@ -38,12 +45,15 @@ function ProfilePage() {
     e.preventDefault();
     if (!profile) return;
     const fd = new FormData(e.currentTarget);
+    const fullName = String(fd.get("full_name") || "").trim();
+    const jobTitle = String(fd.get("job_title") || "").trim();
+    if (!fullName) return toast.error("Full name is required");
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
       .update({
-        full_name: String(fd.get("full_name") || "") || undefined,
-        job_title: String(fd.get("job_title") || "") || undefined,
+        full_name: fullName,
+        job_title: jobTitle || null,
       })
       .eq("id", profile.id);
     setSaving(false);
@@ -56,18 +66,44 @@ function ProfilePage() {
   async function uploadAvatar(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
-    const ext = file.name.split(".").pop() || "jpg";
+    const extensionByType: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/gif": "gif",
+    };
+    const ext = extensionByType[file.type];
+    if (!ext) {
+      e.target.value = "";
+      return toast.error("Choose a JPG, PNG, WebP, or GIF image");
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      e.target.value = "";
+      return toast.error("Profile photos must be 5 MB or smaller");
+    }
+    setAvatarLoading(true);
     const path = `${profile.id}/${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage
       .from("avatars")
-      .upload(path, file, { upsert: true });
-    if (upErr) return toast.error(upErr.message);
+      .upload(path, file, { contentType: file.type, upsert: false });
+    if (upErr) {
+      setAvatarLoading(false);
+      e.target.value = "";
+      return toast.error(upErr.message);
+    }
     const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
     const { error } = await supabase
       .from("profiles")
       .update({ avatar_url: pub.publicUrl })
       .eq("id", profile.id);
-    if (error) return toast.error(error.message);
+    if (error) {
+      await supabase.storage.from("avatars").remove([path]);
+      setAvatarLoading(false);
+      e.target.value = "";
+      return toast.error(error.message);
+    }
+    setAvatarLoading(false);
+    e.target.value = "";
     toast.success("Photo updated");
     qc.invalidateQueries({ queryKey: ["me-profile"] });
     qc.invalidateQueries({ queryKey: ["me-profile-full"] });
@@ -86,7 +122,14 @@ function ProfilePage() {
     (e.currentTarget as HTMLFormElement).reset();
   }
 
-  if (!profile) return <div className="text-sm text-muted-foreground">Loading…</div>;
+  if (isLoading) return <div className="text-sm text-muted-foreground">Loading…</div>;
+  if (profileError || !profile) {
+    return (
+      <div className="text-sm text-destructive">
+        {profileError instanceof Error ? profileError.message : "Profile could not be loaded."}
+      </div>
+    );
+  }
 
   const initials = (profile.full_name || profile.email || "?")
     .split(" ")
@@ -112,8 +155,18 @@ function ProfilePage() {
               </AvatarFallback>
             </Avatar>
             <label className="absolute -bottom-1 -right-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-primary text-white shadow">
-              <Camera className="h-3.5 w-3.5" />
-              <input type="file" accept="image/*" className="hidden" onChange={uploadAvatar} />
+              {avatarLoading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Camera className="h-3.5 w-3.5" />
+              )}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                disabled={avatarLoading}
+                onChange={uploadAvatar}
+              />
             </label>
           </div>
           <div className="min-w-0">
@@ -165,6 +218,7 @@ function ProfilePage() {
             maxLength={6}
             minLength={6}
             required
+            autoComplete="new-password"
             className="w-40 tracking-[0.5em] text-center font-mono"
           />
         </div>

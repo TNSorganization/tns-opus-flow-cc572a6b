@@ -22,9 +22,14 @@ export function useCurrentRoles() {
   return useQuery({
     queryKey: ["current-user-roles"],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
       if (!u.user) return { userId: null as string | null, roles: [] as Role[] };
-      const { data } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", u.user.id);
+      if (error) throw error;
       return {
         userId: u.user.id,
         roles: (data ?? []).map((r) => r.role as Role),
@@ -34,16 +39,16 @@ export function useCurrentRoles() {
   });
 }
 
-/** Whether current user is "active" (has a confirmed, non-revoked matricule
- *  OR is CEO / operations_manager — those two are always active). */
+/** Whether the current user has an active matricule or a bootstrap role. */
 export function useIsActive() {
   return useQuery({
     queryKey: ["is-active"],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
       if (!u.user) return false;
       const { data, error } = await supabase.rpc("is_active", { _uid: u.user.id });
-      if (error) return false;
+      if (error) throw error;
       return !!data;
     },
     staleTime: 15_000,
@@ -57,6 +62,7 @@ export function hasAny(roles: Role[], ...check: Role[]) {
 
 export const isCeo = (r: Role[]) => hasAny(r, "ceo");
 export const isAdmin = (r: Role[]) => hasAny(r, "ceo", "administrator");
+export const isManager = (r: Role[]) => hasAny(r, "ceo", "administrator", "operations_manager");
 export const isOps = (r: Role[]) => hasAny(r, "ceo", "operations_manager");
 export const isFinance = (r: Role[]) => hasAny(r, "ceo", "administrator", "finance_officer");
 export const isDeptHead = (r: Role[]) => hasAny(r, "ceo", "administrator", "department_head");

@@ -874,9 +874,35 @@ export type Database = {
       is_finance: { Args: { _user_id: string }; Returns: boolean };
       is_manager: { Args: { _user_id: string }; Returns: boolean };
       is_ops: { Args: { _uid: string }; Returns: boolean };
+      list_active_profiles: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          avatar_url: string | null;
+          email: string | null;
+          full_name: string | null;
+          id: string;
+        }[];
+      };
+      manage_user_role: {
+        Args: {
+          _action: string;
+          _role: Database["public"]["Enums"]["app_role"];
+          _user_id: string;
+        };
+        Returns: undefined;
+      };
       redeem_matricule: {
         Args: { _code: string };
         Returns: Database["public"]["Enums"]["app_role"];
+      };
+      record_attendance_event: {
+        Args: {
+          _device?: string;
+          _event_type: Database["public"]["Enums"]["attendance_event_type"];
+          _gps_lat?: number;
+          _gps_lng?: number;
+        };
+        Returns: string;
       };
       revoke_matricule: { Args: { _user_id: string }; Returns: undefined };
       run_payroll: {
@@ -898,6 +924,17 @@ export type Database = {
       set_salary: {
         Args: { _amount: number; _currency: string; _user: string };
         Returns: undefined;
+      };
+      set_task_status: {
+        Args: {
+          _status: Database["public"]["Enums"]["task_status"];
+          _task_id: string;
+        };
+        Returns: undefined;
+      };
+      validate_matricule: {
+        Args: { _code: string; _email: string };
+        Returns: boolean;
       };
     };
     Enums: {

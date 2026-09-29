@@ -39,12 +39,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import {
   clearPendingMatricule,
   getPendingMatricule,
   normalizeMatriculeCode,
 } from "@/lib/pending-matricule";
+import { isMissingRpcError } from "@/lib/supabase-errors";
+import { fetchActiveProfiles } from "@/lib/profiles";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -63,12 +65,23 @@ const WEEKDAYS = [
 function SettingsPage() {
   const { data: me } = useCurrentRoles();
   const roles = me?.roles ?? [];
-  const { data: isActive } = useIsActive();
+  const { data: isActive, error: activeError } = useIsActive();
   const ceo = isCeo(roles);
   const admin = ceo || roles.includes("administrator");
   const finance = isFin(roles);
   const ops = isOpsRole(roles);
   const sender = canSend(roles) || finance;
+  const defaultTab = ceo
+    ? "matricules"
+    : admin
+      ? "people"
+      : finance
+        ? "salaries"
+        : ops
+          ? "schedules"
+          : sender
+            ? "notify"
+            : null;
 
   return (
     <div className="space-y-6">
@@ -77,7 +90,13 @@ function SettingsPage() {
         <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
       </header>
 
-      {!isActive && <MatriculeConfirm userId={me?.userId ?? null} />}
+      {isActive === false && <MatriculeConfirm userId={me?.userId ?? null} />}
+
+      {activeError && (
+        <div className="tos-card border-destructive/40 bg-destructive/5 text-sm text-destructive">
+          We couldn't verify your account activation. Check your connection and refresh the page.
+        </div>
+      )}
 
       {isActive && !ceo && !admin && !ops && !finance && (
         <div className="tos-card border-brand-success/40 bg-brand-success/5 text-sm flex items-center gap-3">
@@ -86,81 +105,83 @@ function SettingsPage() {
         </div>
       )}
 
-      <Tabs defaultValue={ceo ? "matricules" : "people"}>
-        <TabsList className="flex-wrap">
-          {ceo && <TabsTrigger value="matricules">Matricules</TabsTrigger>}
-          {admin && <TabsTrigger value="people">People & Roles</TabsTrigger>}
-          {finance && <TabsTrigger value="salaries">Salaries</TabsTrigger>}
-          {ops && <TabsTrigger value="schedules">Work schedules</TabsTrigger>}
-          {ops && <TabsTrigger value="excuses">Absence excuses</TabsTrigger>}
-          {sender && <TabsTrigger value="notify">Send notification</TabsTrigger>}
-          {admin && <TabsTrigger value="departments">Departments</TabsTrigger>}
-          {finance && <TabsTrigger value="finance">Finance lists</TabsTrigger>}
-        </TabsList>
+      {defaultTab && (
+        <Tabs defaultValue={defaultTab}>
+          <TabsList className="flex-wrap">
+            {ceo && <TabsTrigger value="matricules">Matricules</TabsTrigger>}
+            {admin && <TabsTrigger value="people">People & Roles</TabsTrigger>}
+            {finance && <TabsTrigger value="salaries">Salaries</TabsTrigger>}
+            {ops && <TabsTrigger value="schedules">Work schedules</TabsTrigger>}
+            {ops && <TabsTrigger value="excuses">Absence excuses</TabsTrigger>}
+            {sender && <TabsTrigger value="notify">Send notification</TabsTrigger>}
+            {admin && <TabsTrigger value="departments">Departments</TabsTrigger>}
+            {finance && <TabsTrigger value="finance">Finance lists</TabsTrigger>}
+          </TabsList>
 
-        {ceo && (
-          <TabsContent value="matricules" className="mt-4">
-            <MatriculesSettings />
-          </TabsContent>
-        )}
-        {admin && (
-          <TabsContent value="people" className="mt-4">
-            <PeopleSettings ceo={ceo} currentUserId={me?.userId ?? null} />
-          </TabsContent>
-        )}
-        {finance && (
-          <TabsContent value="salaries" className="mt-4">
-            <SalariesTab />
-          </TabsContent>
-        )}
-        {ops && (
-          <TabsContent value="schedules" className="mt-4">
-            <SchedulesTab />
-          </TabsContent>
-        )}
-        {ops && (
-          <TabsContent value="excuses" className="mt-4">
-            <ExcusesTab />
-          </TabsContent>
-        )}
-        {sender && (
-          <TabsContent value="notify" className="mt-4">
-            <NotifyComposer />
-          </TabsContent>
-        )}
-        {admin && (
-          <TabsContent value="departments" className="mt-4">
-            <MasterList
-              table="departments"
-              title="Departments"
-              queryKey={["departments"]}
-              columns={["name", "description"]}
-            />
-          </TabsContent>
-        )}
-        {finance && (
-          <TabsContent value="finance" className="mt-4 space-y-6">
-            <MasterList
-              table="income_sources"
-              title="Income sources"
-              queryKey={["income-sources"]}
-              columns={["name", "description"]}
-            />
-            <MasterList
-              table="expense_categories"
-              title="Expense categories"
-              queryKey={["expense-categories"]}
-              columns={["name", "description"]}
-            />
-            <MasterList
-              table="payment_methods"
-              title="Payment methods"
-              queryKey={["payment-methods"]}
-              columns={["name"]}
-            />
-          </TabsContent>
-        )}
-      </Tabs>
+          {ceo && (
+            <TabsContent value="matricules" className="mt-4">
+              <MatriculesSettings />
+            </TabsContent>
+          )}
+          {admin && (
+            <TabsContent value="people" className="mt-4">
+              <PeopleSettings ceo={ceo} currentUserId={me?.userId ?? null} />
+            </TabsContent>
+          )}
+          {finance && (
+            <TabsContent value="salaries" className="mt-4">
+              <SalariesTab />
+            </TabsContent>
+          )}
+          {ops && (
+            <TabsContent value="schedules" className="mt-4">
+              <SchedulesTab />
+            </TabsContent>
+          )}
+          {ops && (
+            <TabsContent value="excuses" className="mt-4">
+              <ExcusesTab />
+            </TabsContent>
+          )}
+          {sender && (
+            <TabsContent value="notify" className="mt-4">
+              <NotifyComposer />
+            </TabsContent>
+          )}
+          {admin && (
+            <TabsContent value="departments" className="mt-4">
+              <MasterList
+                table="departments"
+                title="Departments"
+                queryKey={["departments"]}
+                columns={["name", "description"]}
+              />
+            </TabsContent>
+          )}
+          {finance && (
+            <TabsContent value="finance" className="mt-4 space-y-6">
+              <MasterList
+                table="income_sources"
+                title="Income sources"
+                queryKey={["income-sources"]}
+                columns={["name", "description"]}
+              />
+              <MasterList
+                table="expense_categories"
+                title="Expense categories"
+                queryKey={["expense-categories"]}
+                columns={["name", "description"]}
+              />
+              <MasterList
+                table="payment_methods"
+                title="Payment methods"
+                queryKey={["payment-methods"]}
+                columns={["name"]}
+              />
+            </TabsContent>
+          )}
+        </Tabs>
+      )}
     </div>
   );
 }
@@ -174,11 +195,12 @@ function MatriculeConfirm({ userId }: { userId: string | null }) {
     queryKey: ["my-matricule", userId],
     enabled: !!userId,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("matricules")
         .select("code, role, confirmed_at, revoked_at")
         .eq("used_by", userId!)
         .maybeSingle();
+      if (error) throw error;
       return data;
     },
   });
@@ -280,14 +302,15 @@ function MatriculesSettings() {
   const create = useMutation({
     mutationFn: async (payload: { full_name: string; email: string; note: string; role: Role }) => {
       const code = genCode();
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u, error: userError } = await supabase.auth.getUser();
+      if (userError || !u.user) throw userError || new Error("Not signed in");
       const { error } = await supabase.from("matricules").insert({
         code,
         role: payload.role,
         full_name: payload.full_name || null,
         email: payload.email || null,
         note: payload.note || null,
-        created_by: u.user?.id ?? null,
+        created_by: u.user.id,
       });
       if (error) throw error;
       return code;
@@ -354,7 +377,7 @@ function MatriculesSettings() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ALL_ROLES.map((r) => (
+                {ALL_ROLES.filter((item) => item !== "ceo").map((r) => (
                   <SelectItem key={r} value={r}>
                     {roleLabel(r)}
                   </SelectItem>
@@ -458,22 +481,40 @@ function PeopleSettings({ ceo, currentUserId }: { ceo: boolean; currentUserId: s
   const qc = useQueryClient();
   const { data: profiles = [] } = useQuery({
     queryKey: ["people-full"],
-    queryFn: async () =>
-      (await supabase.from("profiles").select("id, full_name, email, department_id, job_title"))
-        .data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, department_id, job_title");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: roles = [] } = useQuery({
     queryKey: ["all-roles"],
-    queryFn: async () => (await supabase.from("user_roles").select("user_id, role")).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("user_roles").select("user_id, role");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: depts = [] } = useQuery({
     queryKey: ["departments"],
-    queryFn: async () =>
-      (await supabase.from("departments").select("id, name").order("name")).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("departments").select("id, name").order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
   const addRole = useMutation({
     mutationFn: async ({ user_id, role }: { user_id: string; role: Role }) => {
+      const { error: rpcError } = await supabase.rpc("manage_user_role", {
+        _action: "add",
+        _role: role,
+        _user_id: user_id,
+      });
+      if (!rpcError) return;
+      if (!isMissingRpcError(rpcError)) throw rpcError;
       const { error } = await supabase.from("user_roles").insert({ user_id, role });
       if (error) throw error;
     },
@@ -482,6 +523,13 @@ function PeopleSettings({ ceo, currentUserId }: { ceo: boolean; currentUserId: s
   });
   const removeRole = useMutation({
     mutationFn: async ({ user_id, role }: { user_id: string; role: Role }) => {
+      const { error: rpcError } = await supabase.rpc("manage_user_role", {
+        _action: "remove",
+        _role: role,
+        _user_id: user_id,
+      });
+      if (!rpcError) return;
+      if (!isMissingRpcError(rpcError)) throw rpcError;
       const { error } = await supabase
         .from("user_roles")
         .delete()
@@ -498,7 +546,7 @@ function PeopleSettings({ ceo, currentUserId }: { ceo: boolean; currentUserId: s
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Staff fired");
+      toast.success("Staff account deactivated; historical records were preserved");
       qc.invalidateQueries({ queryKey: ["people-full"] });
       qc.invalidateQueries({ queryKey: ["all-roles"] });
     },
@@ -574,13 +622,15 @@ function PeopleSettings({ ceo, currentUserId }: { ceo: boolean; currentUserId: s
                   className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary"
                 >
                   {roleLabel(r as Role)}
-                  <button
-                    onClick={() => removeRole.mutate({ user_id: p.id, role: r as Role })}
-                    className="text-primary/70 hover:text-primary"
-                    title="Remove role"
-                  >
-                    ×
-                  </button>
+                  {(r !== "ceo" || (ceo && !isSelf)) && (
+                    <button
+                      onClick={() => removeRole.mutate({ user_id: p.id, role: r as Role })}
+                      className="text-primary/70 hover:text-primary"
+                      title="Remove role"
+                    >
+                      ×
+                    </button>
+                  )}
                 </span>
               ))}
               <Select onValueChange={(v) => addRole.mutate({ user_id: p.id, role: v as Role })}>
@@ -588,11 +638,13 @@ function PeopleSettings({ ceo, currentUserId }: { ceo: boolean; currentUserId: s
                   <SelectValue placeholder="Add role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ALL_ROLES.filter((r) => !userRoles.includes(r)).map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {roleLabel(r)}
-                    </SelectItem>
-                  ))}
+                  {ALL_ROLES.filter((r) => !userRoles.includes(r) && (r !== "ceo" || ceo)).map(
+                    (r) => (
+                      <SelectItem key={r} value={r}>
+                        {roleLabel(r)}
+                      </SelectItem>
+                    ),
+                  )}
                 </SelectContent>
               </Select>
               {ceo && !isSelf && (
@@ -615,11 +667,11 @@ function PeopleSettings({ ceo, currentUserId }: { ceo: boolean; currentUserId: s
                     className="h-7 gap-1 border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"
                     onClick={() =>
                       confirm(
-                        `Permanently remove ${p.full_name || p.email}? This is irreversible.`,
+                        `Deactivate ${p.full_name || p.email}? Their access will be disabled while historical records are preserved.`,
                       ) && fire.mutate(p.id)
                     }
                   >
-                    <UserX className="h-3.5 w-3.5" /> Fire
+                    <UserX className="h-3.5 w-3.5" /> Deactivate
                   </Button>
                 </>
               )}
@@ -635,13 +687,15 @@ function SalariesTab() {
   const qc = useQueryClient();
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-min"],
-    queryFn: async () =>
-      (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
+    queryFn: fetchActiveProfiles,
   });
   const { data: sal = [] } = useQuery({
     queryKey: ["salaries"],
-    queryFn: async () =>
-      (await supabase.from("salaries").select("user_id, amount, currency")).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("salaries").select("user_id, amount, currency");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const [period, setPeriod] = useState(format(new Date(), "yyyy-MM"));
   const [note, setNote] = useState("");
@@ -657,6 +711,7 @@ function SalariesTab() {
       amount: number;
       currency: string;
     }) => {
+      if (!Number.isFinite(amount) || amount < 0) throw new Error("Salary cannot be negative");
       const { error } = await supabase.rpc("set_salary", {
         _user: user_id,
         _amount: amount,
@@ -668,6 +723,10 @@ function SalariesTab() {
     onError: (e: Error) => toast.error(e.message),
   });
   async function runPayroll() {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+      return toast.error("Choose a valid payroll month");
+    }
+    if (!confirm(`Run payroll for ${period}? This creates permanent payment records.`)) return;
     setRunning(true);
     const { data, error } = await supabase.rpc("run_payroll", {
       _period: period,
@@ -690,9 +749,9 @@ function SalariesTab() {
           <div className="space-y-1.5">
             <Label>Period</Label>
             <Input
+              type="month"
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              placeholder="YYYY-MM"
               className="w-32 font-mono"
             />
           </div>
@@ -702,9 +761,13 @@ function SalariesTab() {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="e.g. July salaries"
+              maxLength={200}
             />
           </div>
-          <Button onClick={runPayroll} disabled={running}>
+          <Button
+            onClick={runPayroll}
+            disabled={running || !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)}
+          >
             Pay everyone with a salary set
           </Button>
         </div>
@@ -723,9 +786,14 @@ function SalariesTab() {
               onSubmit={(e) => {
                 e.preventDefault();
                 const fd = new FormData(e.currentTarget);
+                const amount = Number(fd.get("amount"));
+                if (!Number.isFinite(amount) || amount < 0) {
+                  toast.error("Salary cannot be negative");
+                  return;
+                }
                 setSal.mutate({
                   user_id: p.id,
-                  amount: Number(fd.get("amount")),
+                  amount,
                   currency: String(fd.get("currency")),
                 });
               }}
@@ -741,6 +809,7 @@ function SalariesTab() {
                 min="0"
                 defaultValue={s?.amount ?? 0}
                 className="w-32"
+                required
               />
               <Select name="currency" defaultValue={s?.currency ?? "XCFA"}>
                 <SelectTrigger className="w-24">
@@ -751,7 +820,7 @@ function SalariesTab() {
                   <SelectItem value="USD">USD</SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="submit" size="sm" variant="outline">
+              <Button type="submit" size="sm" variant="outline" disabled={setSal.isPending}>
                 Save
               </Button>
             </form>
@@ -766,12 +835,15 @@ function SchedulesTab() {
   const qc = useQueryClient();
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-min"],
-    queryFn: async () =>
-      (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
+    queryFn: fetchActiveProfiles,
   });
   const { data: schedules = [] } = useQuery({
     queryKey: ["work-schedules"],
-    queryFn: async () => (await supabase.from("work_schedules").select("*")).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("work_schedules").select("*");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const schedMap = new Map(schedules.map((s) => [s.user_id, s]));
   async function toggle(user_id: string, day: (typeof WEEKDAYS)[number], on: boolean) {
@@ -839,29 +911,30 @@ function ExcusesTab() {
   const qc = useQueryClient();
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-min"],
-    queryFn: async () =>
-      (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
+    queryFn: fetchActiveProfiles,
   });
   const { data: rows = [] } = useQuery({
     queryKey: ["excuses"],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("absence_excuses")
-          .select("*")
-          .order("excuse_date", { ascending: false })
-          .limit(200)
-      ).data ?? [],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("absence_excuses")
+        .select("*")
+        .order("excuse_date", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   async function add(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u, error: userError } = await supabase.auth.getUser();
+    if (userError || !u.user) return toast.error(userError?.message || "Not signed in");
     const { error } = await supabase.from("absence_excuses").insert({
       user_id: String(fd.get("user_id")),
       excuse_date: String(fd.get("excuse_date")),
       reason: String(fd.get("reason") || "") || null,
-      granted_by: u.user?.id,
+      granted_by: u.user.id,
     });
     if (error) return toast.error(error.message);
     (e.currentTarget as HTMLFormElement).reset();
@@ -902,7 +975,7 @@ function ExcusesTab() {
         </div>
         <div className="min-w-48 flex-1 space-y-1.5">
           <Label>Reason</Label>
-          <Input name="reason" placeholder="e.g. medical leave" />
+          <Input name="reason" maxLength={500} placeholder="e.g. medical leave" />
         </div>
         <Button type="submit">
           <Plus className="mr-1 h-4 w-4" /> Excuse
@@ -919,7 +992,7 @@ function ExcusesTab() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm">
                     {p?.full_name || p?.email || "Unknown"} ·{" "}
-                    {format(new Date(r.excuse_date), "d MMM yyyy")}
+                    {format(parseISO(r.excuse_date), "d MMM yyyy")}
                   </div>
                   {r.reason && (
                     <div className="truncate text-xs text-muted-foreground">{r.reason}</div>
@@ -945,13 +1018,12 @@ function NotifyComposer() {
   const [sending, setSending] = useState(false);
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-min"],
-    queryFn: async () =>
-      (await supabase.from("profiles").select("id, full_name, email").order("full_name")).data ??
-      [],
+    queryFn: fetchActiveProfiles,
   });
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    if (target === "user" && !userSel) return toast.error("Choose a recipient");
     setSending(true);
     const { data, error } = await supabase.rpc("send_notification", {
       _title: String(fd.get("title")),
@@ -1058,7 +1130,8 @@ function MasterList({
   const { data: rows = [] } = useQuery({
     queryKey,
     queryFn: async () => {
-      const { data } = await supabase.from(table).select("*").order("name");
+      const { data, error } = await supabase.from(table).select("*").order("name");
+      if (error) throw error;
       return (data as { id: string; name: string; description?: string | null }[]) ?? [];
     },
   });

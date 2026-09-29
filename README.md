@@ -45,6 +45,17 @@ Set the same application root as the production Site URL when GitHub Pages is th
 
 Only Supabase publishable values belong in browser builds. Never add a service-role or secret key to `.env`, GitHub variables, or any `VITE_*` variable.
 
+## Database Migrations
+
+Apply the checked-in Supabase migrations before treating a release as production-ready. From an authenticated Supabase CLI session:
+
+```bash
+bunx supabase link --project-ref <project-ref>
+bunx supabase db push
+```
+
+The migration in [`supabase/migrations`](supabase/migrations) adds the server-side authorization, account activation, attendance, finance, notification, role-management, and storage protections used by the application. The browser includes temporary compatibility fallbacks so it can still connect while an existing project is being migrated, but those fallbacks are not a substitute for applying the database migration.
+
 ## Installable App
 
 The Pages release includes a web app manifest, service worker, offline shell, iOS icon, maskable Android icons, and an in-app installation control. The icons and interface branding are derived from the supplied TNS Community wordmark and mark.
