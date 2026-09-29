@@ -17,7 +17,6 @@ import "@fontsource/geist-mono/400.css";
 import "@fontsource/geist-mono/500.css";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,9 +52,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -97,7 +93,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "The operating system for TNS — attendance, tasks, finance, and executive dashboards in one place.",
+          "The operating system for TNS — attendance, tasks, finance, products, logistics, programs, marketing, and executive dashboards in one place.",
       },
       { name: "theme-color", content: "#0f0f14" },
       { name: "application-name", content: "TNS Opus" },
@@ -109,7 +105,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         property: "og:description",
         content:
-          "The operating system for TNS — attendance, tasks, finance, and executive dashboards in one place.",
+          "The operating system for TNS — attendance, tasks, finance, products, logistics, programs, marketing, and executive dashboards in one place.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -117,7 +113,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "twitter:description",
         content:
-          "The operating system for TNS — attendance, tasks, finance, and executive dashboards in one place.",
+          "The operating system for TNS — attendance, tasks, finance, products, logistics, programs, marketing, and executive dashboards in one place.",
       },
       {
         property: "og:image",

@@ -19,8 +19,12 @@ import { Route as AuthenticatedSopsRouteImport } from './routes/_authenticated/s
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSalaryRouteImport } from './routes/_authenticated/salary'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
+import { Route as AuthenticatedProgramsRouteImport } from './routes/_authenticated/programs'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedPerformanceRouteImport } from './routes/_authenticated/performance'
+import { Route as AuthenticatedMarketingRouteImport } from './routes/_authenticated/marketing'
+import { Route as AuthenticatedLogisticsRouteImport } from './routes/_authenticated/logistics'
 import { Route as AuthenticatedIncomeRouteImport } from './routes/_authenticated/income'
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
 import { Route as AuthenticatedExpensesRouteImport } from './routes/_authenticated/expenses'
@@ -77,9 +81,19 @@ const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedProgramsRoute = AuthenticatedProgramsRouteImport.update({
+  id: '/programs',
+  path: '/programs',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPerformanceRoute =
@@ -88,6 +102,16 @@ const AuthenticatedPerformanceRoute =
     path: '/performance',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedMarketingRoute = AuthenticatedMarketingRouteImport.update({
+  id: '/marketing',
+  path: '/marketing',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedLogisticsRoute = AuthenticatedLogisticsRouteImport.update({
+  id: '/logistics',
+  path: '/logistics',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedIncomeRoute = AuthenticatedIncomeRouteImport.update({
   id: '/income',
   path: '/income',
@@ -130,8 +154,12 @@ export interface FileRoutesByFullPath {
   '/expenses': typeof AuthenticatedExpensesRoute
   '/home': typeof AuthenticatedHomeRoute
   '/income': typeof AuthenticatedIncomeRoute
+  '/logistics': typeof AuthenticatedLogisticsRoute
+  '/marketing': typeof AuthenticatedMarketingRoute
   '/performance': typeof AuthenticatedPerformanceRoute
+  '/products': typeof AuthenticatedProductsRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/programs': typeof AuthenticatedProgramsRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/salary': typeof AuthenticatedSalaryRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -149,8 +177,12 @@ export interface FileRoutesByTo {
   '/expenses': typeof AuthenticatedExpensesRoute
   '/home': typeof AuthenticatedHomeRoute
   '/income': typeof AuthenticatedIncomeRoute
+  '/logistics': typeof AuthenticatedLogisticsRoute
+  '/marketing': typeof AuthenticatedMarketingRoute
   '/performance': typeof AuthenticatedPerformanceRoute
+  '/products': typeof AuthenticatedProductsRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/programs': typeof AuthenticatedProgramsRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/salary': typeof AuthenticatedSalaryRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -170,8 +202,12 @@ export interface FileRoutesById {
   '/_authenticated/expenses': typeof AuthenticatedExpensesRoute
   '/_authenticated/home': typeof AuthenticatedHomeRoute
   '/_authenticated/income': typeof AuthenticatedIncomeRoute
+  '/_authenticated/logistics': typeof AuthenticatedLogisticsRoute
+  '/_authenticated/marketing': typeof AuthenticatedMarketingRoute
   '/_authenticated/performance': typeof AuthenticatedPerformanceRoute
+  '/_authenticated/products': typeof AuthenticatedProductsRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/programs': typeof AuthenticatedProgramsRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/salary': typeof AuthenticatedSalaryRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -191,8 +227,12 @@ export interface FileRouteTypes {
     | '/expenses'
     | '/home'
     | '/income'
+    | '/logistics'
+    | '/marketing'
     | '/performance'
+    | '/products'
     | '/profile'
+    | '/programs'
     | '/reports'
     | '/salary'
     | '/settings'
@@ -210,8 +250,12 @@ export interface FileRouteTypes {
     | '/expenses'
     | '/home'
     | '/income'
+    | '/logistics'
+    | '/marketing'
     | '/performance'
+    | '/products'
     | '/profile'
+    | '/programs'
     | '/reports'
     | '/salary'
     | '/settings'
@@ -230,8 +274,12 @@ export interface FileRouteTypes {
     | '/_authenticated/expenses'
     | '/_authenticated/home'
     | '/_authenticated/income'
+    | '/_authenticated/logistics'
+    | '/_authenticated/marketing'
     | '/_authenticated/performance'
+    | '/_authenticated/products'
     | '/_authenticated/profile'
+    | '/_authenticated/programs'
     | '/_authenticated/reports'
     | '/_authenticated/salary'
     | '/_authenticated/settings'
@@ -319,6 +367,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReportsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/programs': {
+      id: '/_authenticated/programs'
+      path: '/programs'
+      fullPath: '/programs'
+      preLoaderRoute: typeof AuthenticatedProgramsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/profile': {
       id: '/_authenticated/profile'
       path: '/profile'
@@ -326,11 +381,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProfileRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/products': {
+      id: '/_authenticated/products'
+      path: '/products'
+      fullPath: '/products'
+      preLoaderRoute: typeof AuthenticatedProductsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/performance': {
       id: '/_authenticated/performance'
       path: '/performance'
       fullPath: '/performance'
       preLoaderRoute: typeof AuthenticatedPerformanceRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/marketing': {
+      id: '/_authenticated/marketing'
+      path: '/marketing'
+      fullPath: '/marketing'
+      preLoaderRoute: typeof AuthenticatedMarketingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/logistics': {
+      id: '/_authenticated/logistics'
+      path: '/logistics'
+      fullPath: '/logistics'
+      preLoaderRoute: typeof AuthenticatedLogisticsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/income': {
@@ -385,8 +461,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedExpensesRoute: typeof AuthenticatedExpensesRoute
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
   AuthenticatedIncomeRoute: typeof AuthenticatedIncomeRoute
+  AuthenticatedLogisticsRoute: typeof AuthenticatedLogisticsRoute
+  AuthenticatedMarketingRoute: typeof AuthenticatedMarketingRoute
   AuthenticatedPerformanceRoute: typeof AuthenticatedPerformanceRoute
+  AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedProgramsRoute: typeof AuthenticatedProgramsRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSalaryRoute: typeof AuthenticatedSalaryRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -401,8 +481,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedExpensesRoute: AuthenticatedExpensesRoute,
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
   AuthenticatedIncomeRoute: AuthenticatedIncomeRoute,
+  AuthenticatedLogisticsRoute: AuthenticatedLogisticsRoute,
+  AuthenticatedMarketingRoute: AuthenticatedMarketingRoute,
   AuthenticatedPerformanceRoute: AuthenticatedPerformanceRoute,
+  AuthenticatedProductsRoute: AuthenticatedProductsRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedProgramsRoute: AuthenticatedProgramsRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSalaryRoute: AuthenticatedSalaryRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,

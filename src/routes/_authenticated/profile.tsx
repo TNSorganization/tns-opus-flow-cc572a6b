@@ -5,11 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { Loader2, Camera } from "lucide-react";
 import { useCurrentRoles, roleLabel } from "@/hooks/use-current-role";
 import { getSessionUser, withTimeout } from "@/lib/auth-session";
+import { UserAvatar } from "@/components/user-avatar";
+import { AvatarCropDialog } from "@/components/avatar-crop-dialog";
+import { getAvatarObjectPath } from "@/lib/avatar-url";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   component: ProfilePage,
@@ -20,6 +22,7 @@ function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const { data: me } = useCurrentRoles();
 
   const {
@@ -63,50 +66,58 @@ function ProfilePage() {
     qc.invalidateQueries({ queryKey: ["me-profile-full"] });
   }
 
-  async function uploadAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+  function chooseAvatar(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
-    const extensionByType: Record<string, string> = {
-      "image/jpeg": "jpg",
-      "image/png": "png",
-      "image/webp": "webp",
-      "image/gif": "gif",
-    };
-    const ext = extensionByType[file.type];
-    if (!ext) {
+    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
       e.target.value = "";
       return toast.error("Choose a JPG, PNG, WebP, or GIF image");
     }
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > 15 * 1024 * 1024) {
       e.target.value = "";
-      return toast.error("Profile photos must be 5 MB or smaller");
+      return toast.error("Choose an image smaller than 15 MB");
     }
-    setAvatarLoading(true);
-    const path = `${profile.id}/${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage
-      .from("avatars")
-      .upload(path, file, { contentType: file.type, upsert: false });
-    if (upErr) {
-      setAvatarLoading(false);
-      e.target.value = "";
-      return toast.error(upErr.message);
-    }
-    const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ avatar_url: pub.publicUrl })
-      .eq("id", profile.id);
-    if (error) {
-      await supabase.storage.from("avatars").remove([path]);
-      setAvatarLoading(false);
-      e.target.value = "";
-      return toast.error(error.message);
-    }
-    setAvatarLoading(false);
+    setAvatarFile(file);
     e.target.value = "";
-    toast.success("Photo updated");
-    qc.invalidateQueries({ queryKey: ["me-profile"] });
-    qc.invalidateQueries({ queryKey: ["me-profile-full"] });
+  }
+
+  async function uploadAvatar(image: Blob) {
+    if (!profile) return;
+    setAvatarLoading(true);
+    const path = `${profile.id}/${Date.now()}.webp`;
+    let uploaded = false;
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, image, { contentType: "image/webp", upsert: false });
+      if (uploadError) throw uploadError;
+      uploaded = true;
+
+      const { data: publicData } = supabase.storage.from("avatars").getPublicUrl(path);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicData.publicUrl })
+        .eq("id", profile.id);
+      if (error) throw error;
+
+      const previousPath = getAvatarObjectPath(profile.avatar_url);
+      if (previousPath?.startsWith(`${profile.id}/`) && previousPath !== path) {
+        void supabase.storage.from("avatars").remove([previousPath]);
+      }
+
+      setAvatarFile(null);
+      toast.success("Photo cropped and updated");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["me-profile"] }),
+        qc.invalidateQueries({ queryKey: ["me-profile-full"] }),
+        qc.invalidateQueries({ queryKey: ["all-profiles"] }),
+      ]);
+    } catch (error) {
+      if (uploaded) await supabase.storage.from("avatars").remove([path]);
+      toast.error(error instanceof Error ? error.message : "Photo upload failed");
+    } finally {
+      setAvatarLoading(false);
+    }
   }
 
   async function changePassword(e: React.FormEvent<HTMLFormElement>) {
@@ -138,13 +149,6 @@ function ProfilePage() {
     );
   }
 
-  const initials = (profile.full_name || profile.email || "?")
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <header>
@@ -155,13 +159,11 @@ function ProfilePage() {
       <div className="surface p-6">
         <div className="mb-6 flex items-center gap-4">
           <div className="relative">
-            <Avatar className="h-20 w-20">
-              <AvatarImage src={profile.avatar_url ?? undefined} />
-              <AvatarFallback className="gradient-brand text-lg font-bold text-white">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-            <label className="absolute -bottom-1 -right-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-primary text-white shadow">
+            <UserAvatar profile={profile} size="xl" />
+            <label
+              className="absolute -bottom-1 -right-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-primary text-white shadow"
+              title="Choose and crop a profile photo"
+            >
               {avatarLoading ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
@@ -172,7 +174,7 @@ function ProfilePage() {
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 className="hidden"
                 disabled={avatarLoading}
-                onChange={uploadAvatar}
+                onChange={chooseAvatar}
               />
             </label>
           </div>
@@ -246,6 +248,13 @@ function ProfilePage() {
           {pwLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update password"}
         </Button>
       </form>
+
+      <AvatarCropDialog
+        file={avatarFile}
+        saving={avatarLoading}
+        onCancel={() => setAvatarFile(null)}
+        onSave={uploadAvatar}
+      />
     </div>
   );
 }

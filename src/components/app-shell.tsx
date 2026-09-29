@@ -21,12 +21,15 @@ import {
   User,
   Wallet,
   ShieldAlert,
+  Package,
+  Truck,
+  Layers3,
+  Megaphone,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "@/hooks/use-theme";
 import { useIsActive, useCurrentRoles, isOps } from "@/hooks/use-current-role";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -34,6 +37,7 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/brand-logo";
 import { getSessionUser } from "@/lib/auth-session";
+import { UserAvatar } from "@/components/user-avatar";
 
 type NavItem = {
   to: string;
@@ -60,6 +64,15 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       { to: "/expenses", label: "Expenses", icon: ArrowUpCircle, badgeKey: "expenses" },
       { to: "/salary", label: "My Salary", icon: Wallet },
       { to: "/reports", label: "Reports", icon: FileText },
+    ],
+  },
+  {
+    label: "Business",
+    items: [
+      { to: "/products", label: "Products", icon: Package },
+      { to: "/logistics", label: "Logistics", icon: Truck },
+      { to: "/programs", label: "Programs", icon: Layers3 },
+      { to: "/marketing", label: "Marketing", icon: Megaphone },
     ],
   },
   {
@@ -159,18 +172,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     navigate({ to: "/auth", replace: true });
   }
 
-  const initials = (profile?.full_name || profile?.email || "?")
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="fixed hidden h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
         <SidebarInner pathname={pathname} badges={badges} locked={locked} />
-        <SidebarFooter profile={profile} initials={initials} onSignOut={signOut} />
+        <SidebarFooter profile={profile} onSignOut={signOut} />
       </aside>
 
       {mobileOpen && (
@@ -186,7 +192,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Button>
             </div>
             <SidebarInner pathname={pathname} badges={badges} locked={locked} />
-            <SidebarFooter profile={profile} initials={initials} onSignOut={signOut} />
+            <SidebarFooter profile={profile} onSignOut={signOut} />
           </aside>
         </div>
       )}
@@ -343,6 +349,10 @@ function titleFor(path: string): string {
     "/expenses": "Expenses",
     "/salary": "My Salary",
     "/reports": "Reports",
+    "/products": "Products",
+    "/logistics": "Logistics",
+    "/programs": "Programs",
+    "/marketing": "Marketing & Media",
     "/documents": "Documents",
     "/sops": "SOPs & Policies",
     "/settings": "Settings",
@@ -432,25 +442,23 @@ function SidebarInner({
 
 function SidebarFooter({
   profile,
-  initials,
   onSignOut,
 }: {
   profile:
-    | { full_name?: string | null; email?: string | null; avatar_url?: string | null }
+    | {
+        id: string;
+        full_name?: string | null;
+        email?: string | null;
+        avatar_url?: string | null;
+      }
     | null
     | undefined;
-  initials: string;
   onSignOut: () => void;
 }) {
   return (
     <div className="border-t border-sidebar-border p-3">
       <div className="flex items-center gap-3 rounded-md px-2 py-2">
-        <Avatar className="h-9 w-9">
-          <AvatarImage src={profile?.avatar_url ?? undefined} />
-          <AvatarFallback className="gradient-brand text-xs font-bold text-white">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar profile={profile} size="md" />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold">{profile?.full_name || "Loading…"}</div>
           <div className="truncate text-xs text-muted-foreground">{profile?.email}</div>

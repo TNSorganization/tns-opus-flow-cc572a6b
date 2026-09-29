@@ -5,8 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { deriveStatus, type AttendanceEventType } from "@/lib/attendance";
 import { startOfDay, endOfDay, formatDistanceToNowStrict } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { fetchActiveProfiles } from "@/lib/profiles";
+import { UserAvatar } from "@/components/user-avatar";
 
 export const Route = createFileRoute("/_authenticated/board")({
   component: BoardPage,
@@ -133,21 +133,12 @@ function BoardPage() {
               ) : (
                 grouped[b.key].map((p) => {
                   const since = sinceMap.get(p.id);
-                  const initials = (p.full_name || p.email || "?")
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase();
                   return (
                     <div
                       key={p.id}
                       className="flex items-center gap-3 rounded-md border border-border/60 bg-background/40 px-2.5 py-2"
                     >
-                      <Avatar className="h-7 w-7">
-                        <AvatarImage src={p.avatar_url ?? undefined} />
-                        <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar profile={p} size="sm" className="h-7 w-7" />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm">{p.full_name || p.email}</div>
                         {since && (

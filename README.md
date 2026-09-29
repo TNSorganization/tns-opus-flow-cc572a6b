@@ -1,6 +1,6 @@
 # TNS Opus
 
-TNS Opus is the operations application for TNS Community. It covers attendance, productivity, finance, documents, policies, notifications, and role-based dashboards.
+TNS Opus is the operations application for TNS Community. It covers attendance, productivity, finance, products, logistics, programs, marketing, documents, policies, notifications, and role-based dashboards.
 
 ## Development
 
@@ -19,7 +19,7 @@ bun run build
 
 ## GitHub App
 
-The repository deploys an installable static application to GitHub Pages through [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml). The Pages build keeps normal Lovable and Cloudflare builds unchanged while generating a repository-scoped SPA in `dist/client`.
+The repository deploys an installable static application to GitHub Pages through [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml). The Pages build generates a repository-scoped SPA in `dist/client`, while the standard build can also produce a Nitro server deployment.
 
 Production address:
 

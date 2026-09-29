@@ -1,7 +1,7 @@
 {
   "name": "TNS Opus - Operations System",
   "short_name": "TNS Opus",
-  "description": "Attendance, productivity, finance, documents, and executive operations for TNS Community.",
+  "description": "Attendance, productivity, finance, products, logistics, programs, marketing, and executive operations for TNS Community.",
   "id": "./",
   "start_url": "./",
   "scope": "./",
@@ -97,6 +97,12 @@
       "name": "Settings",
       "short_name": "Settings",
       "url": "./settings",
+      "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Products",
+      "short_name": "Products",
+      "url": "./products",
       "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96", "type": "image/png" }]
     }
   ]
