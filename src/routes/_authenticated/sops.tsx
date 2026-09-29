@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { SectionHeader } from "@/components/kpi-card";
 import { isManager, useCurrentRoles } from "@/hooks/use-current-role";
+import { getSessionUser } from "@/lib/auth-session";
 
 export const Route = createFileRoute("/_authenticated/sops")({
   component: SopsPage,
@@ -151,10 +152,10 @@ function NewButton() {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     setLoading(true);
-    const { data: u, error: userError } = await supabase.auth.getUser();
-    if (userError || !u.user) {
+    const user = await getSessionUser();
+    if (!user) {
       setLoading(false);
-      return toast.error(userError?.message || "Not signed in");
+      return toast.error("Not signed in");
     }
     const { error } = await supabase.from("sops").insert({
       kind: String(fd.get("kind")),
@@ -162,7 +163,7 @@ function NewButton() {
       content: String(fd.get("content") || ""),
       version: String(fd.get("version") || "1.0"),
       status: "active",
-      owner_id: u.user.id,
+      owner_id: user.id,
     });
     setLoading(false);
     if (error) return toast.error(error.message);

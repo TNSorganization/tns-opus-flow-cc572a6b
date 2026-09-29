@@ -43,6 +43,7 @@ import {
 } from "date-fns";
 import { toast } from "sonner";
 import { KpiCard, SectionHeader } from "@/components/kpi-card";
+import { getSessionUser } from "@/lib/auth-session";
 import { formatMoney, formatMoneyFull, type Currency } from "@/lib/currency";
 import {
   ResponsiveContainer,
@@ -390,10 +391,10 @@ function NewIncomeButton({
       return toast.error("Amount must be greater than zero");
     }
     setLoading(true);
-    const { data: u, error: userError } = await supabase.auth.getUser();
-    if (userError || !u.user) {
+    const user = await getSessionUser();
+    if (!user) {
       setLoading(false);
-      return toast.error(userError?.message || "Not signed in");
+      return toast.error("Not signed in");
     }
     const { error } = await supabase.from("income_entries").insert({
       entry_date: String(fd.get("entry_date")),
@@ -403,7 +404,7 @@ function NewIncomeButton({
       source_id: (fd.get("source_id") as string) || null,
       payment_method_id: (fd.get("payment_method_id") as string) || null,
       reference: String(fd.get("reference") || "") || null,
-      created_by: u.user.id,
+      created_by: user.id,
     });
     setLoading(false);
     if (error) return toast.error(error.message);

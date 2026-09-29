@@ -2,6 +2,9 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
+const REQUEST_TIMEOUT_MS = 15_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
+
 function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
 }
@@ -25,7 +28,29 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
     }
 
     headers.set("apikey", supabaseKey);
-    return fetch(input, { ...init, headers });
+
+    const requestSignal =
+      init?.signal ??
+      (typeof Request !== "undefined" && input instanceof Request ? input.signal : undefined);
+    const controller = new AbortController();
+    const abortFromRequest = () => controller.abort(requestSignal?.reason);
+    if (requestSignal?.aborted) abortFromRequest();
+    else requestSignal?.addEventListener("abort", abortFromRequest, { once: true });
+
+    const requestUrl =
+      typeof Request !== "undefined" && input instanceof Request ? input.url : String(input);
+    const requestMethod =
+      init?.method ??
+      (typeof Request !== "undefined" && input instanceof Request ? input.method : "GET");
+    const timeoutMs =
+      requestMethod.toUpperCase() !== "GET" && requestUrl.includes("/storage/v1/object/")
+        ? UPLOAD_TIMEOUT_MS
+        : REQUEST_TIMEOUT_MS;
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(input, { ...init, headers, signal: controller.signal }).finally(() => {
+      clearTimeout(timeout);
+      requestSignal?.removeEventListener("abort", abortFromRequest);
+    });
   };
 }
 
@@ -51,7 +76,6 @@ function createSupabaseClient() {
       fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
     },
     auth: {
-      storage: typeof window !== "undefined" ? localStorage : undefined,
       persistSession: true,
       autoRefreshToken: true,
     },

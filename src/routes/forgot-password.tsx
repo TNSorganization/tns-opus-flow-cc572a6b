@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { getAppUrl } from "@/lib/app-url";
+import { withTimeout } from "@/lib/auth-session";
+import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/forgot-password")({
   ssr: false,
@@ -22,12 +24,20 @@ function ForgotPasswordPage() {
     const form = new FormData(e.currentTarget);
     const email = String(form.get("email")).trim().toLowerCase();
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: getAppUrl("reset-password"),
-    });
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    setSent(true);
+    try {
+      const { error } = await withTimeout(
+        supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: getAppUrl("reset-password"),
+        }),
+        15_000,
+      );
+      if (error) return toast.error(error.message);
+      setSent(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Reset request failed.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -48,7 +58,7 @@ function ForgotPasswordPage() {
               <Input id="email" name="email" type="email" required autoComplete="email" />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              Send reset link
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send reset link"}
             </Button>
           </form>
         )}

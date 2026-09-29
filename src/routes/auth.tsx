@@ -16,24 +16,22 @@ import {
   savePendingMatricule,
 } from "@/lib/pending-matricule";
 import { isMissingRpcError } from "@/lib/supabase-errors";
+import { getSessionWithTimeout, withTimeout } from "@/lib/auth-session";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
   component: AuthPage,
 });
 
-// 6-digit numeric password used across signup / signin / reset.
-const PIN_RE = /^\d{6}$/;
-
 function authErrorMessage(message: string) {
   const normalized = message.toLowerCase();
 
-  if (normalized.includes("invalid login credentials")) return "Email or PIN is incorrect.";
+  if (normalized.includes("invalid login credentials")) return "Email or password is incorrect.";
   if (normalized.includes("email not confirmed")) {
     return "Confirm your email before signing in. Check your inbox for the confirmation link.";
   }
   if (normalized.includes("user already registered")) {
-    return "An account already exists for this email. Sign in or use Forgot PIN.";
+    return "An account already exists for this email. Sign in or reset your password.";
   }
   if (normalized.includes("rate limit")) {
     return "Too many attempts. Wait a few minutes, then try again.";
@@ -46,16 +44,17 @@ function AuthPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const [checking, setChecking] = useState(true);
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      if (data.session) navigate({ to: "/home", replace: true });
-      else setChecking(false);
-    });
+    getSessionWithTimeout(4_000)
+      .then((session) => {
+        if (mounted && session) navigate({ to: "/home", replace: true });
+      })
+      .catch(() => {
+        // Keep the form usable when session restoration is slow or offline.
+      });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
         navigate({ to: "/home", replace: true });
@@ -71,22 +70,26 @@ function AuthPage() {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const password = String(form.get("password"));
-    if (!PIN_RE.test(password)) return toast.error("PIN must be 6 digits");
     const email = String(form.get("email")).trim().toLowerCase();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) {
-      setLoading(false);
+    try {
+      const { error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        15_000,
+      );
+      if (!error) {
+        navigate({ to: "/home", replace: true });
+        return;
+      }
       if (error.message.toLowerCase().includes("email not confirmed")) {
         setConfirmationEmail(email);
       }
-      return toast.error(authErrorMessage(error.message));
+      toast.error(authErrorMessage(error.message));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Sign in failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-    navigate({ to: "/home", replace: true });
   }
 
   async function signUpEmail(e: React.FormEvent<HTMLFormElement>) {
@@ -96,98 +99,111 @@ function AuthPage() {
     const email = String(form.get("email")).trim().toLowerCase();
     const password = String(form.get("password"));
     const fullName = String(form.get("full_name") ?? "").trim();
-    if (!PIN_RE.test(password)) return toast.error("PIN must be 6 digits");
+    if (password.length < 6) return toast.error("Password must be at least 6 characters.");
     setConfirmationEmail(null);
     setLoading(true);
 
-    if (matricule) {
-      const { data: isValid, error: validationError } = await supabase.rpc("validate_matricule", {
-        _code: matricule,
-        _email: email,
-      });
+    try {
+      if (matricule) {
+        const { data: isValid, error: validationError } = await withTimeout(
+          supabase.rpc("validate_matricule", {
+            _code: matricule,
+            _email: email,
+          }),
+          15_000,
+        );
 
-      let valid = isValid === true;
-      if (validationError && isMissingRpcError(validationError)) {
-        // Compatibility path for deployments that have not applied the hardening migration yet.
-        const { data: legacyMatricule, error: legacyError } = await supabase
-          .from("matricules")
-          .select("id, used_by, expires_at, email")
-          .eq("code", matricule)
-          .maybeSingle();
-        if (legacyError) {
-          setLoading(false);
+        let valid = isValid === true;
+        if (validationError && isMissingRpcError(validationError)) {
+          // Compatibility path for deployments that have not applied the hardening migration yet.
+          const { data: legacyMatricule, error: legacyError } = await withTimeout(
+            supabase
+              .from("matricules")
+              .select("id, used_by, expires_at, email")
+              .eq("code", matricule)
+              .maybeSingle(),
+            15_000,
+          );
+          if (legacyError) {
+            return toast.error(
+              "We couldn't verify the matricule. Check your connection and try again.",
+            );
+          }
+          valid =
+            !!legacyMatricule &&
+            !legacyMatricule.used_by &&
+            (!legacyMatricule.expires_at || new Date(legacyMatricule.expires_at) >= new Date()) &&
+            (!legacyMatricule.email || legacyMatricule.email.trim().toLowerCase() === email);
+        } else if (validationError) {
           return toast.error(
             "We couldn't verify the matricule. Check your connection and try again.",
           );
         }
-        valid =
-          !!legacyMatricule &&
-          !legacyMatricule.used_by &&
-          (!legacyMatricule.expires_at || new Date(legacyMatricule.expires_at) >= new Date()) &&
-          (!legacyMatricule.email || legacyMatricule.email.trim().toLowerCase() === email);
-      } else if (validationError) {
-        setLoading(false);
+
+        if (!valid) {
+          return toast.error(
+            "This matricule is invalid, expired, used, or issued to another email.",
+          );
+        }
+        savePendingMatricule(matricule, email);
+      }
+
+      const { data: signUpData, error } = await withTimeout(
+        supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: getAppUrl(),
+            data: { full_name: fullName },
+          },
+        }),
+        15_000,
+      );
+      if (error) {
+        clearPendingMatricule(matricule || undefined);
+        return toast.error(authErrorMessage(error.message));
+      }
+
+      if (signUpData.user?.identities?.length === 0) {
+        clearPendingMatricule(matricule || undefined);
         return toast.error(
-          "We couldn't verify the matricule. Check your connection and try again.",
+          "An account already exists for this email. Sign in or reset your password.",
         );
       }
 
-      if (!valid) {
-        setLoading(false);
-        return toast.error("This matricule is invalid, expired, used, or issued to another email.");
+      if (signUpData.session) {
+        toast.success("Account created. Activate your matricule to finish setup.");
+        navigate({ to: "/home", replace: true });
+      } else {
+        setConfirmationEmail(email);
+        toast.success("Account created. Check your inbox to confirm your email.");
       }
-      savePendingMatricule(matricule, email);
-    }
-
-    const { data: signUpData, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: getAppUrl(),
-        data: { full_name: fullName },
-      },
-    });
-    if (error) {
-      clearPendingMatricule(matricule || undefined);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Account creation failed.");
+    } finally {
       setLoading(false);
-      return toast.error(authErrorMessage(error.message));
-    }
-
-    if (signUpData.user?.identities?.length === 0) {
-      clearPendingMatricule(matricule || undefined);
-      setLoading(false);
-      return toast.error("An account already exists for this email. Sign in or use Forgot PIN.");
-    }
-
-    setLoading(false);
-    if (signUpData.session) {
-      toast.success("Account created. Activate your matricule to finish setup.");
-      navigate({ to: "/home", replace: true });
-    } else {
-      setConfirmationEmail(email);
-      toast.success("Account created. Check your inbox to confirm your email.");
     }
   }
 
   async function resendConfirmation() {
     if (!confirmationEmail) return;
     setResending(true);
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email: confirmationEmail,
-      options: { emailRedirectTo: getAppUrl() },
-    });
-    setResending(false);
-    if (error) return toast.error(authErrorMessage(error.message));
-    toast.success("A new confirmation email was sent.");
-  }
-
-  if (checking) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
-    );
+    try {
+      const { error } = await withTimeout(
+        supabase.auth.resend({
+          type: "signup",
+          email: confirmationEmail,
+          options: { emailRedirectTo: getAppUrl() },
+        }),
+        15_000,
+      );
+      if (error) return toast.error(authErrorMessage(error.message));
+      toast.success("A new confirmation email was sent.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Confirmation email could not be sent.");
+    } finally {
+      setResending(false);
+    }
   }
 
   return (
@@ -203,7 +219,9 @@ function AuthPage() {
         <div className="mb-8 text-center">
           <BrandLogo kind="logo" className="mx-auto mb-5 w-56 max-w-[70vw]" />
           <h1 className="text-2xl font-semibold tracking-tight">Operations System</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Sign in with your 6-digit PIN.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Sign in with your email and password.
+          </p>
         </div>
 
         <Card className="surface p-6">
@@ -244,7 +262,7 @@ function AuthPage() {
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="si-pw">6-digit PIN</Label>
+                    <Label htmlFor="si-pw">Password</Label>
                     <Link
                       to="/forgot-password"
                       className="text-xs text-muted-foreground hover:text-foreground"
@@ -256,13 +274,8 @@ function AuthPage() {
                     id="si-pw"
                     name="password"
                     type="password"
-                    inputMode="numeric"
-                    pattern="\d{6}"
-                    maxLength={6}
-                    minLength={6}
                     required
                     autoComplete="current-password"
-                    className="tracking-[0.5em] text-center font-mono"
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
@@ -282,19 +295,18 @@ function AuthPage() {
                   <Input id="su-email" name="email" type="email" required autoComplete="email" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="su-pw">6-digit PIN</Label>
+                  <Label htmlFor="su-pw">Password</Label>
                   <Input
                     id="su-pw"
                     name="password"
                     type="password"
-                    inputMode="numeric"
-                    pattern="\d{6}"
-                    maxLength={6}
                     minLength={6}
                     required
                     autoComplete="new-password"
-                    className="tracking-[0.5em] text-center font-mono"
                   />
+                  <p className="text-[11px] text-muted-foreground">
+                    Use at least 6 characters. Letters, numbers, spaces, and symbols are accepted.
+                  </p>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="su-matricule">Matricule</Label>
@@ -325,7 +337,7 @@ function AuthPage() {
           </Tabs>
         </Card>
         <p className="mt-4 text-center text-xs text-muted-foreground">
-          Google sign-in is temporarily unavailable. Use your email and 6-digit PIN.
+          Google sign-in is temporarily unavailable. Use your email and password.
         </p>
       </div>
     </div>

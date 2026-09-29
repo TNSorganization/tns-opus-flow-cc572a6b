@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { getSessionUser } from "@/lib/auth-session";
 
 export type Role = Database["public"]["Enums"]["app_role"];
 
@@ -22,16 +23,15 @@ export function useCurrentRoles() {
   return useQuery({
     queryKey: ["current-user-roles"],
     queryFn: async () => {
-      const { data: u, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!u.user) return { userId: null as string | null, roles: [] as Role[] };
+      const user = await getSessionUser();
+      if (!user) return { userId: null as string | null, roles: [] as Role[] };
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", u.user.id);
+        .eq("user_id", user.id);
       if (error) throw error;
       return {
-        userId: u.user.id,
+        userId: user.id,
         roles: (data ?? []).map((r) => r.role as Role),
       };
     },
@@ -44,10 +44,9 @@ export function useIsActive() {
   return useQuery({
     queryKey: ["is-active"],
     queryFn: async () => {
-      const { data: u, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!u.user) return false;
-      const { data, error } = await supabase.rpc("is_active", { _uid: u.user.id });
+      const user = await getSessionUser();
+      if (!user) return false;
+      const { data, error } = await supabase.rpc("is_active", { _uid: user.id });
       if (error) throw error;
       return !!data;
     },

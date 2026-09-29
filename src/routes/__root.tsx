@@ -172,7 +172,11 @@ function RootComponent() {
     if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
 
     navigator.serviceWorker
-      .register(getAssetUrl("sw.js"), { scope: import.meta.env.BASE_URL })
+      .register(getAssetUrl("sw.js"), {
+        scope: import.meta.env.BASE_URL,
+        updateViaCache: "none",
+      })
+      .then((registration) => registration.update())
       .catch((error) => console.warn("Service worker registration failed", error));
   }, []);
 

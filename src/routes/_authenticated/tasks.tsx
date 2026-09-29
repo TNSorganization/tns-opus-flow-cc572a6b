@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 import { isMissingRpcError } from "@/lib/supabase-errors";
 import { fetchActiveProfiles } from "@/lib/profiles";
+import { getSessionUser } from "@/lib/auth-session";
 
 type TaskStatus = Database["public"]["Enums"]["task_status"];
 type TaskPriority = Database["public"]["Enums"]["task_priority"];
@@ -348,10 +349,10 @@ function NewTaskDialog({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     setLoading(true);
-    const { data: u, error: userError } = await supabase.auth.getUser();
-    if (userError || !u.user) {
+    const user = await getSessionUser();
+    if (!user) {
       setLoading(false);
-      return toast.error(userError?.message || "Not signed in");
+      return toast.error("Not signed in");
     }
     const deadline = String(fd.get("deadline") || "");
     const { error } = await supabase.from("tasks").insert({
@@ -360,7 +361,7 @@ function NewTaskDialog({
       priority: (fd.get("priority") as TaskPriority) || "medium",
       deadline: deadline ? endOfDay(parseISO(deadline)).toISOString() : null,
       assigned_to: (fd.get("assigned_to") as string) || null,
-      assigned_by: u.user.id,
+      assigned_by: user.id,
     });
     setLoading(false);
     if (error) return toast.error(error.message);

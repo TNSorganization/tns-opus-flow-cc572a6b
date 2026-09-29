@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { Loader2, Camera } from "lucide-react";
 import { useCurrentRoles, roleLabel } from "@/hooks/use-current-role";
+import { getSessionUser, withTimeout } from "@/lib/auth-session";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   component: ProfilePage,
@@ -28,13 +29,12 @@ function ProfilePage() {
   } = useQuery({
     queryKey: ["me-profile-full"],
     queryFn: async () => {
-      const { data: u, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!u.user) return null;
+      const user = await getSessionUser();
+      if (!user) return null;
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, email, avatar_url, department_id, job_title")
-        .eq("id", u.user.id)
+        .eq("id", user.id)
         .maybeSingle();
       if (error) throw error;
       return data;
@@ -109,17 +109,24 @@ function ProfilePage() {
     qc.invalidateQueries({ queryKey: ["me-profile-full"] });
   }
 
-  async function changePin(e: React.FormEvent<HTMLFormElement>) {
+  async function changePassword(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const pin = String(fd.get("new_pin"));
-    if (!/^\d{6}$/.test(pin)) return toast.error("PIN must be 6 digits");
+    const password = String(fd.get("new_password"));
+    const confirmation = String(fd.get("password_confirmation"));
+    if (password.length < 6) return toast.error("Password must be at least 6 characters.");
+    if (password !== confirmation) return toast.error("The passwords do not match.");
     setPwLoading(true);
-    const { error } = await supabase.auth.updateUser({ password: pin });
-    setPwLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("PIN updated");
-    (e.currentTarget as HTMLFormElement).reset();
+    try {
+      const { error } = await withTimeout(supabase.auth.updateUser({ password }), 15_000);
+      if (error) return toast.error(error.message);
+      toast.success("Password updated");
+      (e.currentTarget as HTMLFormElement).reset();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Password update failed.");
+    } finally {
+      setPwLoading(false);
+    }
   }
 
   if (isLoading) return <div className="text-sm text-muted-foreground">Loading…</div>;
@@ -206,24 +213,37 @@ function ProfilePage() {
         </form>
       </div>
 
-      <form onSubmit={changePin} className="surface space-y-3 p-6">
-        <h3 className="text-sm font-semibold">Change your 6-digit PIN</h3>
-        <div className="space-y-1.5">
-          <Label>New PIN</Label>
-          <Input
-            name="new_pin"
-            type="password"
-            inputMode="numeric"
-            pattern="\d{6}"
-            maxLength={6}
-            minLength={6}
-            required
-            autoComplete="new-password"
-            className="w-40 tracking-[0.5em] text-center font-mono"
-          />
+      <form onSubmit={changePassword} className="surface space-y-3 p-6">
+        <h3 className="text-sm font-semibold">Change your password</h3>
+        <p className="text-xs text-muted-foreground">
+          Use at least 6 characters. Letters, numbers, spaces, and symbols are accepted.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="new-password">New password</Label>
+            <Input
+              id="new-password"
+              name="new_password"
+              type="password"
+              minLength={6}
+              required
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="password-confirmation">Confirm password</Label>
+            <Input
+              id="password-confirmation"
+              name="password_confirmation"
+              type="password"
+              minLength={6}
+              required
+              autoComplete="new-password"
+            />
+          </div>
         </div>
         <Button type="submit" disabled={pwLoading}>
-          {pwLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update PIN"}
+          {pwLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update password"}
         </Button>
       </form>
     </div>

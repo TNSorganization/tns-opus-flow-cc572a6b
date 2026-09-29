@@ -13,7 +13,7 @@ import { LogIn, Coffee, Play, LogOut, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay } from "date-fns";
-import { motion, AnimatePresence } from "framer-motion";
+import { getSessionUser } from "@/lib/auth-session";
 
 export const Route = createFileRoute("/_authenticated/home")({
   component: HomePage,
@@ -50,13 +50,12 @@ function HomePage() {
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["attendance-today"],
     queryFn: async () => {
-      const { data: u, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!u.user) return [];
+      const user = await getSessionUser();
+      if (!user) return [];
       const { data, error } = await supabase
         .from("attendance_events")
         .select("id, event_type, event_at")
-        .eq("user_id", u.user.id)
+        .eq("user_id", user.id)
         .gte("event_at", startOfDay(today).toISOString())
         .lte("event_at", endOfDay(today).toISOString())
         .order("event_at", { ascending: true });
@@ -136,28 +135,24 @@ function HomePage() {
           <p className="text-sm text-muted-foreground">No events yet. Tap Check In to start.</p>
         ) : (
           <ol className="space-y-2">
-            <AnimatePresence initial={false}>
-              {events.map((e) => {
-                const meta = LABELS[e.event_type as AttendanceEventType];
-                const Icon = meta.Icon;
-                return (
-                  <motion.li
-                    key={e.id}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center justify-between rounded-md border border-border/60 bg-background/40 px-3 py-2 text-sm"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Icon className={cn("h-4 w-4", meta.tone)} />
-                      <span>{meta.label}</span>
-                    </div>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {format(new Date(e.event_at), "HH:mm:ss")}
-                    </span>
-                  </motion.li>
-                );
-              })}
-            </AnimatePresence>
+            {events.map((e) => {
+              const meta = LABELS[e.event_type as AttendanceEventType];
+              const Icon = meta.Icon;
+              return (
+                <li
+                  key={e.id}
+                  className="animate-in fade-in slide-in-from-bottom-1 flex items-center justify-between rounded-md border border-border/60 bg-background/40 px-3 py-2 text-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className={cn("h-4 w-4", meta.tone)} />
+                    <span>{meta.label}</span>
+                  </div>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {format(new Date(e.event_at), "HH:mm:ss")}
+                  </span>
+                </li>
+              );
+            })}
           </ol>
         )}
       </section>

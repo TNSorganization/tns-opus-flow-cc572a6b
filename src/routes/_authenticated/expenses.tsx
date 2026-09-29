@@ -43,6 +43,7 @@ import { KpiCard, SectionHeader } from "@/components/kpi-card";
 import { formatMoney, formatMoneyFull, type Currency } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import { fetchActiveProfiles } from "@/lib/profiles";
+import { getSessionUser } from "@/lib/auth-session";
 import {
   ResponsiveContainer,
   PieChart,
@@ -195,13 +196,13 @@ function ExpensesPage() {
 
   const approve = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
-      const { data: u, error: userError } = await supabase.auth.getUser();
-      if (userError || !u.user) throw userError || new Error("Not signed in");
+      const user = await getSessionUser();
+      if (!user) throw new Error("Not signed in");
       const { error } = await supabase
         .from("expense_entries")
         .update({
           status,
-          approved_by: status === "approved" ? u.user.id : null,
+          approved_by: status === "approved" ? user.id : null,
           approved_at: status === "approved" ? new Date().toISOString() : null,
         })
         .eq("id", id);
@@ -491,10 +492,10 @@ function NewExpenseButton({
       return toast.error("Amount must be greater than zero");
     }
     setLoading(true);
-    const { data: u, error: userError } = await supabase.auth.getUser();
-    if (userError || !u.user) {
+    const user = await getSessionUser();
+    if (!user) {
       setLoading(false);
-      return toast.error(userError?.message || "Not signed in");
+      return toast.error("Not signed in");
     }
     const recordedAt = new Date().toISOString();
     const { error } = await supabase.from("expense_entries").insert({
@@ -507,9 +508,9 @@ function NewExpenseButton({
       payment_method_id: (fd.get("payment_method_id") as string) || null,
       reference: String(fd.get("reference") || "") || null,
       status: mode === "record" ? "approved" : "pending",
-      approved_by: mode === "record" ? u.user.id : null,
+      approved_by: mode === "record" ? user.id : null,
       approved_at: mode === "record" ? recordedAt : null,
-      created_by: u.user.id,
+      created_by: user.id,
     });
     setLoading(false);
     if (error) return toast.error(error.message);

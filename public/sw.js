@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "tns-opus";
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "__BUILD_VERSION__";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 const APP_ROOT = new URL("./", self.registration.scope).href;
 const PRECACHE = [
@@ -38,15 +38,35 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (request.mode === "navigate") {
+    const networkResponse = fetch(request)
+      .then(async (response) => {
+        if (!response.ok) return null;
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(APP_ROOT, response.clone());
+        return response;
+      })
+      .catch(() => null);
+
+    // Keep refreshing in the background even when the cached shell wins the race.
+    event.waitUntil(networkResponse.then(() => undefined));
     event.respondWith(
-      fetch(request)
-        .then(async (response) => {
-          if (!response.ok) return (await caches.match(APP_ROOT)) || response;
-          const cache = await caches.open(CACHE_NAME);
-          cache.put(APP_ROOT, response.clone());
-          return response;
-        })
-        .catch(() => caches.match(APP_ROOT)),
+      (async () => {
+        const cached = await caches.match(APP_ROOT);
+        if (!cached) {
+          return (
+            (await networkResponse) ||
+            new Response("TNS Opus is temporarily unavailable.", {
+              status: 503,
+              headers: { "Content-Type": "text/plain; charset=utf-8" },
+            })
+          );
+        }
+
+        return Promise.race([
+          networkResponse.then((response) => response || cached),
+          new Promise((resolve) => setTimeout(() => resolve(cached), 1_500)),
+        ]);
+      })(),
     );
     return;
   }

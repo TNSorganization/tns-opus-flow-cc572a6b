@@ -50,6 +50,7 @@ jobs:
       - name: Prepare SPA fallback
         run: |
           test -f dist/client/index.html
+          sed -i "s/__BUILD_VERSION__/${GITHUB_SHA}/g" dist/client/sw.js
           cp dist/client/index.html dist/client/404.html
           for route in auth forgot-password reset-password dashboard home board tasks performance income expenses salary reports documents sops profile settings; do
             mkdir -p "dist/client/$route"

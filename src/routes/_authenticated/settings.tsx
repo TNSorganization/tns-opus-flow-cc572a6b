@@ -47,6 +47,7 @@ import {
 } from "@/lib/pending-matricule";
 import { isMissingRpcError } from "@/lib/supabase-errors";
 import { fetchActiveProfiles } from "@/lib/profiles";
+import { getSessionUser } from "@/lib/auth-session";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -302,15 +303,15 @@ function MatriculesSettings() {
   const create = useMutation({
     mutationFn: async (payload: { full_name: string; email: string; note: string; role: Role }) => {
       const code = genCode();
-      const { data: u, error: userError } = await supabase.auth.getUser();
-      if (userError || !u.user) throw userError || new Error("Not signed in");
+      const user = await getSessionUser();
+      if (!user) throw new Error("Not signed in");
       const { error } = await supabase.from("matricules").insert({
         code,
         role: payload.role,
         full_name: payload.full_name || null,
         email: payload.email || null,
         note: payload.note || null,
-        created_by: u.user.id,
+        created_by: user.id,
       });
       if (error) throw error;
       return code;
@@ -928,13 +929,13 @@ function ExcusesTab() {
   async function add(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const { data: u, error: userError } = await supabase.auth.getUser();
-    if (userError || !u.user) return toast.error(userError?.message || "Not signed in");
+    const user = await getSessionUser();
+    if (!user) return toast.error("Not signed in");
     const { error } = await supabase.from("absence_excuses").insert({
       user_id: String(fd.get("user_id")),
       excuse_date: String(fd.get("excuse_date")),
       reason: String(fd.get("reason") || "") || null,
-      granted_by: u.user.id,
+      granted_by: user.id,
     });
     if (error) return toast.error(error.message);
     (e.currentTarget as HTMLFormElement).reset();

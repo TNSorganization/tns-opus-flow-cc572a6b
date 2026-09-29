@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { getSessionWithTimeout, withTimeout } from "@/lib/auth-session";
 
 export const Route = createFileRoute("/reset-password")({
   ssr: false,
@@ -29,22 +30,32 @@ function ResetPasswordPage() {
       setChecking(false);
     });
 
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (!mounted) return;
-      if (data.session) {
-        setCanReset(true);
-      } else {
-        const query = new URLSearchParams(window.location.search);
-        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    getSessionWithTimeout(12_000)
+      .then((session) => {
+        if (!mounted) return;
+        if (session) {
+          setCanReset(true);
+        } else {
+          const query = new URLSearchParams(window.location.search);
+          const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+          setRecoveryError(
+            query.get("error_description") ||
+              hash.get("error_description") ||
+              "This reset link is invalid or has expired.",
+          );
+        }
+      })
+      .catch((error) => {
+        if (!mounted) return;
         setRecoveryError(
-          query.get("error_description") ||
-            hash.get("error_description") ||
-            error?.message ||
-            "This reset link is invalid or has expired.",
+          error instanceof Error
+            ? error.message
+            : "We couldn't open this reset link. Check your connection and try again.",
         );
-      }
-      setChecking(false);
-    });
+      })
+      .finally(() => {
+        if (mounted) setChecking(false);
+      });
 
     return () => {
       mounted = false;
@@ -56,13 +67,20 @@ function ResetPasswordPage() {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const password = String(form.get("password"));
-    if (!/^\d{6}$/.test(password)) return toast.error("PIN must be 6 digits.");
+    const confirmation = String(form.get("password_confirmation"));
+    if (password.length < 6) return toast.error("Password must be at least 6 characters.");
+    if (password !== confirmation) return toast.error("The passwords do not match.");
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("PIN updated.");
-    navigate({ to: "/home", replace: true });
+    try {
+      const { error } = await withTimeout(supabase.auth.updateUser({ password }), 15_000);
+      if (error) return toast.error(error.message);
+      toast.success("Password updated.");
+      navigate({ to: "/home", replace: true });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Password update failed.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (checking) {
@@ -90,25 +108,35 @@ function ResetPasswordPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="surface w-full max-w-md p-6">
-        <h1 className="text-xl font-semibold">Set a new 6-digit PIN</h1>
+        <h1 className="text-xl font-semibold">Set a new password</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Use at least 6 characters. Any letters, numbers, spaces, or symbols are accepted.
+        </p>
         <form onSubmit={submit} className="mt-6 space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="pw">New PIN</Label>
+            <Label htmlFor="pw">New password</Label>
             <Input
               id="pw"
               name="password"
               type="password"
-              inputMode="numeric"
-              pattern="\d{6}"
-              maxLength={6}
               minLength={6}
               required
               autoComplete="new-password"
-              className="tracking-[0.5em] text-center font-mono"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="pw-confirmation">Confirm new password</Label>
+            <Input
+              id="pw-confirmation"
+              name="password_confirmation"
+              type="password"
+              minLength={6}
+              required
+              autoComplete="new-password"
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update PIN"}
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update password"}
           </Button>
         </form>
       </Card>

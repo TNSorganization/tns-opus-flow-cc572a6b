@@ -33,6 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { formatDistanceToNowStrict } from "date-fns";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/brand-logo";
+import { getSessionUser } from "@/lib/auth-session";
 
 type NavItem = {
   to: string;
@@ -126,13 +127,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { data: profile } = useQuery({
     queryKey: ["me-profile"],
     queryFn: async () => {
-      const { data: u, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!u.user) return null;
+      const user = await getSessionUser();
+      if (!user) return null;
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, email, avatar_url")
-        .eq("id", u.user.id)
+        .eq("id", user.id)
         .maybeSingle();
       if (error) throw error;
       return data;

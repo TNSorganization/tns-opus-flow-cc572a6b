@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { isMissingRpcError } from "@/lib/supabase-errors";
+import { getSessionUser } from "@/lib/auth-session";
 
 export type AttendanceEventType = Database["public"]["Enums"]["attendance_event_type"];
 
@@ -98,9 +99,8 @@ export function fmtDuration(ms: number) {
 }
 
 export async function recordEvent(type: AttendanceEventType) {
-  const { data: u, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  if (!u.user) throw new Error("Not signed in");
+  const user = await getSessionUser();
+  if (!user) throw new Error("Not signed in");
   const gps = await new Promise<{ lat?: number; lng?: number }>((resolve) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return resolve({});
     navigator.geolocation.getCurrentPosition(
@@ -121,7 +121,7 @@ export async function recordEvent(type: AttendanceEventType) {
 
   // Compatibility path until the hardening migration reaches the hosted project.
   return supabase.from("attendance_events").insert({
-    user_id: u.user.id,
+    user_id: user.id,
     event_type: type,
     gps_lat: gps.lat ?? null,
     gps_lng: gps.lng ?? null,

@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { isManager, useCurrentRoles } from "@/hooks/use-current-role";
+import { getSessionUser } from "@/lib/auth-session";
 
 export const Route = createFileRoute("/_authenticated/documents")({
   component: DocumentsPage,
@@ -248,12 +249,12 @@ function UploadButton({ folders }: { folders: { id: string; name: string }[] }) 
     const contentType = DOCUMENT_MIME_BY_EXTENSION[extension];
     if (!contentType) return toast.error("This file type is not supported");
     setLoading(true);
-    const { data: u, error: userError } = await supabase.auth.getUser();
-    if (userError || !u.user) {
+    const user = await getSessionUser();
+    if (!user) {
       setLoading(false);
-      return toast.error(userError?.message || "Not signed in");
+      return toast.error("Not signed in");
     }
-    const path = `${u.user.id}/${Date.now()}-${crypto.randomUUID()}-${safeStorageName(file.name)}`;
+    const path = `${user.id}/${Date.now()}-${crypto.randomUUID()}-${safeStorageName(file.name)}`;
     const up = await supabase.storage.from("documents").upload(path, file, { contentType });
     if (up.error) {
       setLoading(false);
@@ -266,7 +267,7 @@ function UploadButton({ folders }: { folders: { id: string; name: string }[] }) 
       file_path: path,
       mime_type: contentType,
       size_bytes: file.size,
-      uploaded_by: u.user.id,
+      uploaded_by: user.id,
     });
     setLoading(false);
     if (error) {
