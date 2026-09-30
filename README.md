@@ -14,12 +14,13 @@ Quality checks:
 ```bash
 bun run lint
 bun run typecheck
+bun run test
 bun run build
 ```
 
 ## GitHub App
 
-The repository deploys an installable static application to GitHub Pages through [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml). The Pages build generates a repository-scoped SPA in `dist/client`, while the standard build can also produce a Nitro server deployment.
+The repository deploys a static application to GitHub Pages through [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml). The Pages build generates a repository-scoped SPA in `dist/client`, while the standard build can also produce a Nitro server deployment.
 
 Production address:
 
@@ -41,7 +42,7 @@ Add this production pattern in **Supabase -> Authentication -> URL Configuration
 https://tnsorganization.github.io/tns-opus-flow-cc572a6b/**
 ```
 
-Set the same application root as the production Site URL when GitHub Pages is the primary host. Email confirmation, password recovery, and Google sign-in derive their callback URLs from the deployed repository path.
+Set the same application root as the production Site URL when GitHub Pages is the primary host. Email confirmation, password recovery, and Google sign-in all return through the explicit `/callback` route. The callback accepts Supabase PKCE codes, implicit tokens, and hashed OTP links so current and older email templates remain compatible.
 
 Only Supabase publishable values belong in browser builds. Never add a service-role or secret key to `.env`, GitHub variables, or any `VITE_*` variable.
 
@@ -56,6 +57,6 @@ bunx supabase db push
 
 The migration in [`supabase/migrations`](supabase/migrations) adds the server-side authorization, account activation, attendance, finance, notification, role-management, and storage protections used by the application. The browser includes temporary compatibility fallbacks so it can still connect while an existing project is being migrated, but those fallbacks are not a substitute for applying the database migration.
 
-## Installable App
+## Fresh Releases
 
-The Pages release includes a web app manifest, service worker, offline shell, iOS icon, maskable Android icons, and an in-app installation control. The icons and interface branding are derived from the supplied TNS Community wordmark and mark.
+The Pages release includes the web app manifest, iOS icon, maskable Android icons, and interface branding derived from the supplied TNS Community wordmark and mark. Offline caching is intentionally disabled for now: the previous service worker could keep an outdated authentication screen after a deployment. Every visit therefore loads the current GitHub release, and a small retirement worker removes caches left by older installations.

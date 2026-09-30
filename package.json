@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "bun test",
     "format": "prettier --write ."
   },
   "dependencies": {

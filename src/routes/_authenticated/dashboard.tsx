@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +18,18 @@ import {
   subDays,
 } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useBusinessModuleHealth, type BusinessModule } from "@/hooks/use-business-module-health";
+import {
+  ArrowRight,
+  CalendarClock,
+  ClipboardCheck,
+  HandCoins,
+  Layers3,
+  Megaphone,
+  Package,
+  ReceiptText,
+  Truck,
+} from "lucide-react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -32,8 +44,50 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 
+const WORKSPACE_LINKS: {
+  to: string;
+  label: string;
+  detail: string;
+  icon: typeof CalendarClock;
+  module?: BusinessModule;
+}[] = [
+  { to: "/home", label: "Attendance", detail: "Clock and daily rhythm", icon: CalendarClock },
+  { to: "/tasks", label: "Productivity", detail: "Assignments and delivery", icon: ClipboardCheck },
+  { to: "/income", label: "Income", detail: "Revenue and sources", icon: HandCoins },
+  { to: "/expenses", label: "Expenses", detail: "Requests and spending", icon: ReceiptText },
+  {
+    to: "/products",
+    label: "Products",
+    detail: "Portfolio and orders",
+    icon: Package,
+    module: "products",
+  },
+  {
+    to: "/logistics",
+    label: "Logistics",
+    detail: "Assets and rentals",
+    icon: Truck,
+    module: "logistics",
+  },
+  {
+    to: "/programs",
+    label: "Programs",
+    detail: "Programs and initiatives",
+    icon: Layers3,
+    module: "programs",
+  },
+  {
+    to: "/marketing",
+    label: "Marketing",
+    detail: "Media and partners",
+    icon: Megaphone,
+    module: "marketing",
+  },
+];
+
 function DashboardPage() {
   const [currency, setCurrency] = useState<Currency>("XCFA");
+  const { data: moduleHealth } = useBusinessModuleHealth(true);
   useRealtimeInvalidate(
     "dashboard-live",
     ["attendance_events", "tasks", "expense_entries", "income_entries"],
@@ -156,8 +210,51 @@ function DashboardPage() {
     <div className="space-y-8">
       <header>
         <p className="text-sm text-muted-foreground">{format(today, "EEEE, d MMMM yyyy")}</p>
-        <h1 className="text-3xl font-semibold tracking-tight">Executive Dashboard</h1>
+        <h1 className="text-3xl font-semibold tracking-[-0.04em]">Executive Dashboard</h1>
       </header>
+
+      <section>
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">
+              Workspace
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">Every operating module in one view</p>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {WORKSPACE_LINKS.map((item) => {
+            const Icon = item.icon;
+            const setupPending = item.module ? moduleHealth?.[item.module] === false : false;
+            return (
+              <Link
+                key={item.to}
+                to={item.to as "/home"}
+                className="group surface flex min-h-28 items-start gap-3 p-4 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2 text-sm font-semibold">
+                    {item.label}
+                    {setupPending && (
+                      <span
+                        className="h-2 w-2 rounded-full bg-brand-orange"
+                        title="Database setup pending"
+                      />
+                    )}
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                    {setupPending ? "Screen ready; database pending" : item.detail}
+                  </span>
+                </span>
+                <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
       <section>
         <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">

@@ -5,30 +5,8 @@ import type { Database } from "./types";
 const REQUEST_TIMEOUT_MS = 15_000;
 const UPLOAD_TIMEOUT_MS = 120_000;
 
-function isNewSupabaseApiKey(value: string): boolean {
-  return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
-}
-
-function createSupabaseFetch(supabaseKey: string): typeof fetch {
+function createSupabaseFetch(): typeof fetch {
   return (input, init) => {
-    const headers = new Headers(
-      typeof Request !== "undefined" && input instanceof Request ? input.headers : undefined,
-    );
-
-    if (init?.headers) {
-      new Headers(init.headers).forEach((value, key) => headers.set(key, value));
-    }
-
-    // New Supabase API keys are opaque strings, not bearer JWTs.
-    if (
-      isNewSupabaseApiKey(supabaseKey) &&
-      headers.get("Authorization") === `Bearer ${supabaseKey}`
-    ) {
-      headers.delete("Authorization");
-    }
-
-    headers.set("apikey", supabaseKey);
-
     const requestSignal =
       init?.signal ??
       (typeof Request !== "undefined" && input instanceof Request ? input.signal : undefined);
@@ -47,7 +25,7 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
         ? UPLOAD_TIMEOUT_MS
         : REQUEST_TIMEOUT_MS;
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
-    return fetch(input, { ...init, headers, signal: controller.signal }).finally(() => {
+    return fetch(input, { ...init, signal: controller.signal }).finally(() => {
       clearTimeout(timeout);
       requestSignal?.removeEventListener("abort", abortFromRequest);
     });
@@ -73,11 +51,15 @@ function createSupabaseClient() {
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     global: {
-      fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
+      fetch: createSupabaseFetch(),
     },
     auth: {
       persistSession: true,
       autoRefreshToken: true,
+      detectSessionInUrl: false,
+      // Recovery emails can be opened on a different device without a locally
+      // stored PKCE verifier. The callback still accepts PKCE links when present.
+      flowType: "implicit",
     },
   });
 }

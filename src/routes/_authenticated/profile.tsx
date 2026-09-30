@@ -12,6 +12,8 @@ import { getSessionUser, withTimeout } from "@/lib/auth-session";
 import { UserAvatar } from "@/components/user-avatar";
 import { AvatarCropDialog } from "@/components/avatar-crop-dialog";
 import { getAvatarObjectPath } from "@/lib/avatar-url";
+import { PasswordField } from "@/components/password-field";
+import { authErrorMessage, passwordIssue } from "@/lib/auth-flow";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   component: ProfilePage,
@@ -125,7 +127,8 @@ function ProfilePage() {
     const fd = new FormData(e.currentTarget);
     const password = String(fd.get("new_password"));
     const confirmation = String(fd.get("password_confirmation"));
-    if (password.length < 6) return toast.error("Password must be at least 6 characters.");
+    const issue = passwordIssue(password);
+    if (issue) return toast.error(issue);
     if (password !== confirmation) return toast.error("The passwords do not match.");
     setPwLoading(true);
     try {
@@ -134,7 +137,7 @@ function ProfilePage() {
       toast.success("Password updated");
       (e.currentTarget as HTMLFormElement).reset();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Password update failed.");
+      toast.error(authErrorMessage(error));
     } finally {
       setPwLoading(false);
     }
@@ -223,10 +226,9 @@ function ProfilePage() {
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="new-password">New password</Label>
-            <Input
+            <PasswordField
               id="new-password"
               name="new_password"
-              type="password"
               minLength={6}
               required
               autoComplete="new-password"
@@ -234,10 +236,9 @@ function ProfilePage() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="password-confirmation">Confirm password</Label>
-            <Input
+            <PasswordField
               id="password-confirmation"
               name="password_confirmation"
-              type="password"
               minLength={6}
               required
               autoComplete="new-password"

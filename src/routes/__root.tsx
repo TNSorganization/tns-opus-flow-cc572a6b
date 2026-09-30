@@ -18,7 +18,6 @@ import "@fontsource/geist-mono/500.css";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
-import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { supabase } from "@/integrations/supabase/client";
 import { getAssetUrl } from "@/lib/app-url";
 
@@ -95,7 +94,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "The operating system for TNS — attendance, tasks, finance, products, logistics, programs, marketing, and executive dashboards in one place.",
       },
-      { name: "theme-color", content: "#0f0f14" },
+      { name: "theme-color", content: "#12281f" },
       { name: "application-name", content: "TNS Opus" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
@@ -165,22 +164,35 @@ function RootComponent() {
   }, [router, queryClient]);
 
   useEffect(() => {
-    if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
-
-    navigator.serviceWorker
-      .register(getAssetUrl("sw.js"), {
-        scope: import.meta.env.BASE_URL,
-        updateViaCache: "none",
-      })
-      .then((registration) => registration.update())
-      .catch((error) => console.warn("Service worker registration failed", error));
+    // The previous offline worker could keep an outdated authentication shell alive.
+    // Opus now favors a fresh network build until offline updates can be made transactional.
+    if ("serviceWorker" in navigator) {
+      const appScope = new URL(getAssetUrl(""), window.location.origin).toString();
+      void navigator.serviceWorker
+        .getRegistrations()
+        .then((registrations) =>
+          Promise.all(
+            registrations
+              .filter((registration) => registration.scope.startsWith(appScope))
+              .map((registration) => registration.unregister()),
+          ),
+        );
+    }
+    if ("caches" in window) {
+      void caches
+        .keys()
+        .then((keys) =>
+          Promise.all(
+            keys.filter((key) => key.startsWith("tns-opus")).map((key) => caches.delete(key)),
+          ),
+        );
+    }
   }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
       <Toaster />
-      <PwaInstallPrompt />
     </QueryClientProvider>
   );
 }

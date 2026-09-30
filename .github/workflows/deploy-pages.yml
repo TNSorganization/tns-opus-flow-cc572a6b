@@ -41,18 +41,19 @@ jobs:
         run: |
           bun run lint
           bun run typecheck
+          bun run test
 
       - name: Build GitHub Pages application
         run: bun run build:pages
         env:
           VITE_PUBLIC_APP_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+          VITE_BUILD_SHA: ${{ github.sha }}
 
       - name: Prepare SPA fallback
         run: |
           test -f dist/client/index.html
-          sed -i "s/__BUILD_VERSION__/${GITHUB_SHA}/g" dist/client/sw.js
           cp dist/client/index.html dist/client/404.html
-          for route in auth forgot-password reset-password dashboard home board tasks performance income expenses salary reports products logistics programs marketing documents sops profile settings; do
+          for route in auth callback forgot-password reset-password dashboard home board tasks performance income expenses salary reports products logistics programs marketing documents sops profile settings; do
             mkdir -p "dist/client/$route"
             cp dist/client/index.html "dist/client/$route/index.html"
           done

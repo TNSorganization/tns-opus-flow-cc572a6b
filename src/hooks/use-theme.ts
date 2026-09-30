@@ -5,17 +5,15 @@ type Theme = "dark" | "light";
 
 function apply(theme: Theme) {
   const root = document.documentElement;
-  if (theme === "light") {
-    root.classList.add("light");
-  } else {
-    root.classList.remove("light");
-  }
+  root.classList.toggle("dark", theme === "dark");
+  root.classList.toggle("light", theme === "light");
 }
 
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "dark";
-    return (localStorage.getItem(KEY) as Theme) || "dark";
+    if (typeof window === "undefined") return "light";
+    const saved = localStorage.getItem(KEY);
+    return saved === "dark" || saved === "light" ? saved : "light";
   });
 
   useEffect(() => {

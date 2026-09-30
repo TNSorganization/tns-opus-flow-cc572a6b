@@ -34,5 +34,8 @@ jobs:
       - name: Type-check
         run: bun run typecheck
 
+      - name: Test authentication flows
+        run: bun run test
+
       - name: Build application
         run: bun run build

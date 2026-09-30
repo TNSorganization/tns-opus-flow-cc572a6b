@@ -1,13 +1,19 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { KeyRound, Loader2, ShieldCheck } from "lucide-react";
+import { AuthShell } from "@/components/auth-shell";
+import { PasswordField } from "@/components/password-field";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
-import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
-import { getSessionWithTimeout, withTimeout } from "@/lib/auth-session";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  authErrorMessage,
+  completeAuthCallback,
+  hasAuthCallback,
+  passwordIssue,
+} from "@/lib/auth-flow";
+import { getAppUrl } from "@/lib/app-url";
+import { withTimeout } from "@/lib/auth-session";
 
 export const Route = createFileRoute("/reset-password")({
   ssr: false,
@@ -15,131 +21,170 @@ export const Route = createFileRoute("/reset-password")({
 });
 
 function ResetPasswordPage() {
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [canReset, setCanReset] = useState(false);
-  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted || !session) return;
-      setCanReset(true);
-      setRecoveryError(null);
-      setChecking(false);
+    let active = true;
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active || !session) return;
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+        setReady(true);
+        setError(null);
+        setChecking(false);
+      }
     });
 
-    getSessionWithTimeout(12_000)
-      .then((session) => {
-        if (!mounted) return;
-        if (session) {
-          setCanReset(true);
-        } else {
-          const query = new URLSearchParams(window.location.search);
-          const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-          setRecoveryError(
-            query.get("error_description") ||
-              hash.get("error_description") ||
-              "This reset link is invalid or has expired.",
-          );
+    async function initialize() {
+      try {
+        const callbackPresent = hasAuthCallback(window.location.href);
+        const result = await withTimeout(completeAuthCallback(window.location.href), 15_000);
+        if (!active) return;
+        if (!result.session) throw new Error("This password-reset link is invalid or has expired.");
+        setReady(true);
+        setError(null);
+        if (callbackPresent) {
+          window.history.replaceState({}, document.title, getAppUrl("reset-password"));
         }
-      })
-      .catch((error) => {
-        if (!mounted) return;
-        setRecoveryError(
-          error instanceof Error
-            ? error.message
-            : "We couldn't open this reset link. Check your connection and try again.",
-        );
-      })
-      .finally(() => {
-        if (mounted) setChecking(false);
-      });
+      } catch (recoveryError) {
+        if (active) setError(authErrorMessage(recoveryError));
+      } finally {
+        if (active) setChecking(false);
+      }
+    }
 
+    void initialize();
     return () => {
-      mounted = false;
-      listener.subscription.unsubscribe();
+      active = false;
+      data.subscription.unsubscribe();
     };
   }, []);
 
-  async function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const password = String(form.get("password"));
-    const confirmation = String(form.get("password_confirmation"));
-    if (password.length < 6) return toast.error("Password must be at least 6 characters.");
-    if (password !== confirmation) return toast.error("The passwords do not match.");
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const password = String(form.get("password") ?? "");
+    const confirmation = String(form.get("password_confirmation") ?? "");
+    const issue = passwordIssue(password);
+    setError(null);
+
+    if (issue) return setError(issue);
+    if (password !== confirmation) return setError("The two passwords do not match exactly.");
     setLoading(true);
+
     try {
-      const { error } = await withTimeout(supabase.auth.updateUser({ password }), 15_000);
-      if (error) return toast.error(error.message);
-      toast.success("Password updated.");
-      navigate({ to: "/home", replace: true });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Password update failed.");
-    } finally {
+      const { data, error: updateError } = await withTimeout(
+        supabase.auth.updateUser({ password }),
+        15_000,
+      );
+      if (updateError) throw updateError;
+      if (!data.user) throw new Error("Supabase did not confirm the password update.");
+
+      const { error: signOutError } = await supabase.auth.signOut({ scope: "global" });
+      if (signOutError) await supabase.auth.signOut({ scope: "local" });
+      window.location.replace(getAppUrl("auth?password=updated"));
+    } catch (updateError) {
+      setError(authErrorMessage(updateError));
       setLoading(false);
     }
   }
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
+      <AuthShell
+        eyebrow="Secure recovery"
+        title="Opening your reset link"
+        description="Opus is validating this one-time link with Supabase."
+      >
+        <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" /> Checking link...
+        </div>
+      </AuthShell>
     );
   }
 
-  if (!canReset) {
+  if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <Card className="surface w-full max-w-md p-6 text-center">
-          <h1 className="text-xl font-semibold">Request a new reset link</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{recoveryError}</p>
-          <Button asChild className="mt-6">
-            <Link to="/forgot-password">Send another link</Link>
+      <AuthShell
+        eyebrow="Secure recovery"
+        title="This link cannot be used"
+        description="Recovery links are single-use and expire. Requesting a new one is the safest next step."
+        footer={
+          <Link
+            to="/auth"
+            className="block text-center text-sm font-semibold text-primary hover:underline"
+          >
+            Back to sign in
+          </Link>
+        }
+      >
+        <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5">
+          <p className="text-sm text-destructive">{error || "This link is invalid or expired."}</p>
+          <Button asChild className="mt-5 w-full">
+            <Link to="/forgot-password">Request a new reset link</Link>
           </Button>
-        </Card>
-      </div>
+        </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="surface w-full max-w-md p-6">
-        <h1 className="text-xl font-semibold">Set a new password</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Use at least 6 characters. Any letters, numbers, spaces, or symbols are accepted.
-        </p>
-        <form onSubmit={submit} className="mt-6 space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="pw">New password</Label>
-            <Input
-              id="pw"
-              name="password"
-              type="password"
-              minLength={6}
-              required
-              autoComplete="new-password"
-            />
+    <AuthShell
+      eyebrow="Secure recovery"
+      title="Choose a new password"
+      description="Your new password is saved exactly as typed. Spaces, symbols, accents, and mixed scripts are accepted."
+      footer={
+        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <ShieldCheck className="h-4 w-4 text-brand-success" /> One-time encrypted recovery session
+        </div>
+      }
+    >
+      <form onSubmit={submit} className="space-y-5" noValidate>
+        {error && (
+          <div
+            className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+            role="alert"
+          >
+            {error}
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="pw-confirmation">Confirm new password</Label>
-            <Input
-              id="pw-confirmation"
-              name="password_confirmation"
-              type="password"
-              minLength={6}
-              required
-              autoComplete="new-password"
-            />
+        )}
+        <div className="rounded-2xl border border-border bg-card/70 p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-brand-success">
+            <KeyRound className="h-4 w-4" /> Reset link verified
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update password"}
-          </Button>
-        </form>
-      </Card>
-    </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="new-password">New password</Label>
+          <PasswordField
+            id="new-password"
+            name="password"
+            minLength={6}
+            required
+            autoComplete="new-password"
+            className="h-11"
+            autoFocus
+          />
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            Minimum 6 characters. No required combination of numbers, capitals, or symbols.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="confirm-password">Confirm new password</Label>
+          <PasswordField
+            id="confirm-password"
+            name="password_confirmation"
+            minLength={6}
+            required
+            autoComplete="new-password"
+            className="h-11"
+          />
+        </div>
+        <Button type="submit" className="h-11 w-full" disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save new password"}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }
