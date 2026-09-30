@@ -42,7 +42,9 @@ Add this production pattern in **Supabase -> Authentication -> URL Configuration
 https://tnsorganization.github.io/tns-opus-flow-cc572a6b/**
 ```
 
-Set the same application root as the production Site URL when GitHub Pages is the primary host. Email confirmation, password recovery, and Google sign-in all return through the explicit `/callback` route. The callback accepts Supabase PKCE codes, implicit tokens, and hashed OTP links so current and older email templates remain compatible.
+Set the same application root as the production Site URL when GitHub Pages is the primary host. Email confirmation and password recovery return through the explicit `/callback` route. The callback accepts Supabase PKCE codes, implicit tokens, and hashed OTP links so current and older email templates remain compatible.
+
+The checked-in `supabase/config.toml` declares the production Site URL and redirect allowlist. Preview changes with `bunx supabase config diff --project-ref <project-ref>`, then apply them with `bunx supabase config push --project-ref <project-ref>` after reviewing the diff.
 
 Only Supabase publishable values belong in browser builds. Never add a service-role or secret key to `.env`, GitHub variables, or any `VITE_*` variable.
 
@@ -54,6 +56,8 @@ Apply the checked-in Supabase migrations before treating a release as production
 bunx supabase link --project-ref <project-ref>
 bunx supabase db push
 ```
+
+The exact Auth email `tnsorganization@gmail.com` is bootstrapped as the TNS owner by the database and does not require a matricule. The rule reads the protected `auth.users.email` field, not editable user metadata; all other accounts still require a valid matricule.
 
 The migration in [`supabase/migrations`](supabase/migrations) adds the server-side authorization, account activation, attendance, finance, notification, role-management, and storage protections used by the application. The browser includes temporary compatibility fallbacks so it can still connect while an existing project is being migrated, but those fallbacks are not a substitute for applying the database migration.
 

@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
-import { getPendingMatricule } from "@/lib/pending-matricule";
+import { isTrustedOwnerEmail } from "@/lib/access";
+import { clearPendingMatricule, getPendingMatricule } from "@/lib/pending-matricule";
 import { getSessionWithTimeout } from "@/lib/auth-session";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -14,7 +15,9 @@ export const Route = createFileRoute("/_authenticated")({
     }
     if (!session?.user) throw redirect({ to: "/auth" });
 
-    const pendingMatricule = getPendingMatricule(session.user.email);
+    const trustedOwner = isTrustedOwnerEmail(session.user.email);
+    if (trustedOwner) clearPendingMatricule();
+    const pendingMatricule = trustedOwner ? null : getPendingMatricule(session.user.email);
     const pathname = location.pathname.replace(/\/+$/, "");
     if (pendingMatricule && !pathname.endsWith("/settings")) {
       throw redirect({ to: "/settings" });

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
+import { isTrustedOwnerEmail, normalizeEmail } from "@/lib/access";
 import { authErrorMessage, passwordIssue } from "@/lib/auth-flow";
 import { getAppUrl } from "@/lib/app-url";
 import { getSessionWithTimeout, withTimeout } from "@/lib/auth-session";
@@ -24,13 +25,15 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-type PendingAction = "signin" | "signup" | "google" | "resend" | null;
+type PendingAction = "signin" | "signup" | "resend" | null;
 
 function AuthPage() {
   const navigate = useNavigate();
   const [pending, setPending] = useState<PendingAction>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
+  const [signupEmail, setSignupEmail] = useState("");
+  const trustedOwnerSignup = isTrustedOwnerEmail(signupEmail);
   const passwordChanged = new URL(window.location.href).searchParams.get("password") === "updated";
 
   useEffect(() => {
@@ -62,9 +65,7 @@ function AuthPage() {
   async function signInEmail(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const email = String(form.get("email") ?? "")
-      .trim()
-      .toLowerCase();
+    const email = normalizeEmail(String(form.get("email") ?? ""));
     const password = String(form.get("password") ?? "");
     setFormError(null);
     setPending("signin");
@@ -115,29 +116,34 @@ function AuthPage() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const fullName = String(form.get("full_name") ?? "").trim();
-    const email = String(form.get("email") ?? "")
-      .trim()
-      .toLowerCase();
+    const email = normalizeEmail(String(form.get("email") ?? ""));
     const password = String(form.get("password") ?? "");
     const matricule = normalizeMatriculeCode(String(form.get("matricule") ?? ""));
+    const trustedOwner = isTrustedOwnerEmail(email);
     const issue = passwordIssue(password);
 
     setFormError(null);
     setConfirmationEmail(null);
     if (issue) return setFormError(issue);
-    if (!matricule) return setFormError("Enter the matricule issued to you by TNS.");
+    if (!trustedOwner && !matricule) {
+      return setFormError("Enter the matricule issued to you by TNS.");
+    }
     setPending("signup");
 
     try {
-      const valid = await validateMatricule(matricule, email);
-      if (!valid) {
-        setFormError(
-          "This matricule is invalid, expired, already used, or assigned to another email.",
-        );
-        return;
+      if (trustedOwner) {
+        clearPendingMatricule();
+      } else {
+        const valid = await validateMatricule(matricule, email);
+        if (!valid) {
+          setFormError(
+            "This matricule is invalid, expired, already used, or assigned to another email.",
+          );
+          return;
+        }
+        savePendingMatricule(matricule, email);
       }
 
-      savePendingMatricule(matricule, email);
       const { data, error } = await withTimeout(
         supabase.auth.signUp({
           email,
@@ -152,39 +158,26 @@ function AuthPage() {
       if (error) throw error;
 
       if (data.user?.identities?.length === 0) {
-        clearPendingMatricule(matricule);
+        clearPendingMatricule(trustedOwner ? undefined : matricule);
         setFormError("An account already exists for this email. Sign in or reset its password.");
         return;
       }
 
       if (data.session) {
-        toast.success("Account created. Confirm your matricule to unlock the workspace.");
-        navigate({ to: "/settings", replace: true });
+        if (trustedOwner) {
+          toast.success("Owner account created. Welcome to Opus.");
+          navigate({ to: "/home", replace: true });
+        } else {
+          toast.success("Account created. Confirm your matricule to unlock the workspace.");
+          navigate({ to: "/settings", replace: true });
+        }
       } else {
         setConfirmationEmail(email);
       }
     } catch (error) {
-      clearPendingMatricule(matricule);
+      clearPendingMatricule(trustedOwner ? undefined : matricule);
       setFormError(authErrorMessage(error));
     } finally {
-      setPending(null);
-    }
-  }
-
-  async function signInWithGoogle() {
-    setFormError(null);
-    setPending("google");
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: getAppUrl("callback?intent=oauth"),
-          queryParams: { prompt: "select_account" },
-        },
-      });
-      if (error) throw error;
-    } catch (error) {
-      setFormError(authErrorMessage(error));
       setPending(null);
     }
   }
@@ -265,30 +258,6 @@ function AuthPage() {
         </div>
       )}
 
-      <Button
-        type="button"
-        variant="outline"
-        className="h-11 w-full bg-card"
-        disabled={pending !== null}
-        onClick={signInWithGoogle}
-      >
-        {pending === "google" ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <span className="flex items-center gap-2">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-[#4285f4] shadow-sm">
-              G
-            </span>
-            Continue with Google
-          </span>
-        )}
-      </Button>
-
-      <div className="my-5 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-        <span className="h-px flex-1 bg-border" /> or use email{" "}
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
       <Tabs defaultValue="signin">
         <TabsList className="grid h-11 w-full grid-cols-2 rounded-xl">
           <TabsTrigger value="signin" className="rounded-lg">
@@ -359,6 +328,8 @@ function AuthPage() {
                 autoComplete="email"
                 inputMode="email"
                 className="h-11"
+                value={signupEmail}
+                onChange={(event) => setSignupEmail(event.currentTarget.value)}
               />
             </div>
             <div className="space-y-2">
@@ -375,20 +346,32 @@ function AuthPage() {
                 At least 6 characters. Spaces, symbols, accents, and mixed scripts are accepted.
               </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="signup-matricule">Matricule</Label>
-              <Input
-                id="signup-matricule"
-                name="matricule"
-                required
-                autoComplete="off"
-                placeholder="Code issued by TNS"
-                className="h-11 uppercase tracking-wider"
-                onChange={(event) => {
-                  event.currentTarget.value = event.currentTarget.value.toUpperCase();
-                }}
-              />
-            </div>
+            {trustedOwnerSignup ? (
+              <div
+                className="rounded-xl border border-brand-success/30 bg-brand-success/10 p-3 text-sm"
+                role="status"
+              >
+                <p className="font-semibold text-foreground">TNS owner account recognized</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  No matricule is required for this organization email.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="signup-matricule">Matricule</Label>
+                <Input
+                  id="signup-matricule"
+                  name="matricule"
+                  required
+                  autoComplete="off"
+                  placeholder="Code issued by TNS"
+                  className="h-11 uppercase tracking-wider"
+                  onChange={(event) => {
+                    event.currentTarget.value = event.currentTarget.value.toUpperCase();
+                  }}
+                />
+              </div>
+            )}
             <Button type="submit" className="h-11 w-full" disabled={pending !== null}>
               {pending === "signup" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

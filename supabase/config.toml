@@ -1,1 +1,10 @@
-project_id = "mpdtwnictosudgixrbgk"
+project_id = "risxxnhplpqljairsoej"
+
+[auth]
+site_url = "https://tnsorganization.github.io/tns-opus-flow-cc572a6b/"
+additional_redirect_urls = [
+  "https://tnsorganization.github.io/tns-opus-flow-cc572a6b/**",
+  "http://localhost:8080/**",
+]
+minimum_password_length = 6
+password_requirements = ""
