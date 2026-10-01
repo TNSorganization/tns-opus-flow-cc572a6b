@@ -2,6 +2,8 @@
 
 TNS Opus is the operations application for TNS Community. It covers attendance, productivity, finance, products, logistics, programs, marketing, documents, policies, notifications, and role-based dashboards.
 
+The GitHub Pages release is installable as a Progressive Web App. Its service worker uses network-first navigation so installed copies receive current authentication and application screens, while versioned assets remain available for faster repeat launches.
+
 ## Development
 
 ```bash

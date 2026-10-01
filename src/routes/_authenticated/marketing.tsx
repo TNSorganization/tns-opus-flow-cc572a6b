@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { formatDual } from "@/lib/currency";
 import { useCurrentRoles, isManager } from "@/hooks/use-current-role";
 import { ModuleErrorState } from "@/components/module-error-state";
+import { fromSelectValue, NO_SELECTION_VALUE, toSelectValue } from "@/lib/select-value";
 
 export const Route = createFileRoute("/_authenticated/marketing")({
   component: MarketingPage,
@@ -731,7 +732,7 @@ function ServiceFormDialog({
 }) {
   const [loading, setLoading] = useState(false);
   const [type, setType] = useState(existing?.service_type ?? "individual");
-  const [recommendation, setRecommendation] = useState(existing?.recommendation ?? "");
+  const [recommendation, setRecommendation] = useState(toSelectValue(existing?.recommendation));
   const [scores, setScores] = useState<Record<string, boolean>>(existing?.efficiency_scores ?? {});
 
   function toggleScore(metric: string) {
@@ -750,7 +751,7 @@ function ServiceFormDialog({
       what_they_do: String(fd.get("what_they_do") ?? "").trim() || null,
       what_they_do_best: String(fd.get("what_they_do_best") ?? "").trim() || null,
       worked_before: fd.get("worked_before") === "on",
-      recommendation: recommendation || null,
+      recommendation: fromSelectValue(recommendation),
     };
     if (!payload.name) return toast.error("Name required");
     setLoading(true);
@@ -842,7 +843,7 @@ function ServiceFormDialog({
                   <SelectValue placeholder="None" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value={NO_SELECTION_VALUE}>None</SelectItem>
                   {RECOMMENDATIONS.map((r) => (
                     <SelectItem key={r.key} value={r.key}>
                       {r.label}

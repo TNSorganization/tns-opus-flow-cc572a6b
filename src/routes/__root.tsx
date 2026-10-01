@@ -17,9 +17,11 @@ import "@fontsource/geist-mono/400.css";
 import "@fontsource/geist-mono/500.css";
 
 import appCss from "../styles.css?url";
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getAssetUrl } from "@/lib/app-url";
+import { registerServiceWorker } from "@/lib/register-service-worker";
 
 const publicAppUrl = import.meta.env.VITE_PUBLIC_APP_URL?.replace(/\/$/, "");
 const shareImage = publicAppUrl
@@ -164,34 +166,13 @@ function RootComponent() {
   }, [router, queryClient]);
 
   useEffect(() => {
-    // The previous offline worker could keep an outdated authentication shell alive.
-    // Opus now favors a fresh network build until offline updates can be made transactional.
-    if ("serviceWorker" in navigator) {
-      const appScope = new URL(getAssetUrl(""), window.location.origin).toString();
-      void navigator.serviceWorker
-        .getRegistrations()
-        .then((registrations) =>
-          Promise.all(
-            registrations
-              .filter((registration) => registration.scope.startsWith(appScope))
-              .map((registration) => registration.unregister()),
-          ),
-        );
-    }
-    if ("caches" in window) {
-      void caches
-        .keys()
-        .then((keys) =>
-          Promise.all(
-            keys.filter((key) => key.startsWith("tns-opus")).map((key) => caches.delete(key)),
-          ),
-        );
-    }
+    return registerServiceWorker();
   }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
+      <PwaInstallPrompt />
       <Toaster />
     </QueryClientProvider>
   );

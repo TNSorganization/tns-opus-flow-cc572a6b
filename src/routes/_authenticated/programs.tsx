@@ -38,6 +38,7 @@ import { formatDual, formatDualCompact } from "@/lib/currency";
 import { fetchActiveProfiles } from "@/lib/profiles";
 import { getSessionUser } from "@/lib/auth-session";
 import { ModuleErrorState } from "@/components/module-error-state";
+import { fromSelectValue, NO_SELECTION_VALUE, toSelectValue } from "@/lib/select-value";
 
 export const Route = createFileRoute("/_authenticated/programs")({
   component: ProgramsPage,
@@ -431,8 +432,8 @@ function ProgramFormDialog({
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(existing?.status ?? "upcoming");
   const [type, setType] = useState(existing?.program_type ?? "campaign");
-  const [frequency, setFrequency] = useState(existing?.frequency ?? "");
-  const [responsibleId, setResponsibleId] = useState(existing?.responsible_user_id ?? "");
+  const [frequency, setFrequency] = useState(toSelectValue(existing?.frequency));
+  const [responsibleId, setResponsibleId] = useState(toSelectValue(existing?.responsible_user_id));
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -442,28 +443,30 @@ function ProgramFormDialog({
       name: String(fd.get("name") ?? "").trim(),
       program_type: type,
       status,
-      frequency: frequency || null,
+      frequency: fromSelectValue(frequency),
       money_in: Number(fd.get("money_in")) || 0,
       money_out: Number(fd.get("money_out")) || 0,
       description: String(fd.get("description") ?? "").trim() || null,
-      responsible_user_id: responsibleId || null,
+      responsible_user_id: fromSelectValue(responsibleId),
       contact_info: String(fd.get("contact_info") ?? "").trim() || null,
     };
     if (!payload.name) return toast.error("Name required");
     setLoading(true);
-    let error;
-    if (existing) {
-      ({ error } = await supabase
-        .from("programs" as never)
-        .update(payload as never)
-        .eq("id", existing.id));
-    } else {
-      ({ error } = await supabase.from("programs" as never).insert(payload as never));
+    try {
+      const { error } = existing
+        ? await supabase
+            .from("programs" as never)
+            .update(payload as never)
+            .eq("id", existing.id)
+        : await supabase.from("programs" as never).insert(payload as never);
+      if (error) throw error;
+      toast.success(existing ? "Program updated" : "Program created");
+      onDone();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Program could not be saved.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-    if (error) return toast.error((error as { message: string }).message);
-    toast.success(existing ? "Program updated" : "Program created");
-    onDone();
   }
 
   return (
@@ -515,7 +518,7 @@ function ProgramFormDialog({
                   <SelectValue placeholder="None" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value={NO_SELECTION_VALUE}>None</SelectItem>
                   {FREQUENCIES.map((f) => (
                     <SelectItem key={f} value={f}>
                       {f}
@@ -551,7 +554,7 @@ function ProgramFormDialog({
                   <SelectValue placeholder="Select person…" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value={NO_SELECTION_VALUE}>None</SelectItem>
                   {people.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.full_name || p.email}
@@ -1035,7 +1038,7 @@ function InitiativeFormDialog({
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(existing?.status ?? "submitted");
   const [house, setHouse] = useState(existing?.house ?? "maja");
-  const [responsibleId, setResponsibleId] = useState(existing?.responsible_user_id ?? "");
+  const [responsibleId, setResponsibleId] = useState(toSelectValue(existing?.responsible_user_id));
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -1049,7 +1052,7 @@ function InitiativeFormDialog({
       start_date: String(fd.get("start_date") ?? "") || null,
       end_date: String(fd.get("end_date") ?? "") || null,
       description: String(fd.get("description") ?? "").trim() || null,
-      responsible_user_id: responsibleId || null,
+      responsible_user_id: fromSelectValue(responsibleId),
       contact_info: String(fd.get("contact_info") ?? "").trim() || null,
     };
     if (!payload.name) return toast.error("Name required");
@@ -1118,7 +1121,7 @@ function InitiativeFormDialog({
                   <SelectValue placeholder="Select person…" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value={NO_SELECTION_VALUE}>None</SelectItem>
                   {people.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.full_name || p.email}

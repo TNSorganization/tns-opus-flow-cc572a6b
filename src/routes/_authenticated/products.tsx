@@ -28,6 +28,7 @@ import { format, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useCurrentRoles, isManager } from "@/hooks/use-current-role";
 import { ModuleErrorState } from "@/components/module-error-state";
+import { fromSelectValue, NO_SELECTION_VALUE, toSelectValue } from "@/lib/select-value";
 
 export const Route = createFileRoute("/_authenticated/products")({
   component: ProductsPage,
@@ -452,14 +453,14 @@ function ProductFormDialog({
 }) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(existing?.status ?? "development");
-  const [categoryId, setCategoryId] = useState(existing?.category_id ?? "");
+  const [categoryId, setCategoryId] = useState(toSelectValue(existing?.category_id));
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const payload = {
       name: String(fd.get("name") ?? "").trim(),
-      category_id: categoryId || null,
+      category_id: fromSelectValue(categoryId),
       status,
       description: String(fd.get("description") ?? "").trim() || null,
       build_cost: Number(fd.get("build_cost")) || null,
@@ -472,19 +473,21 @@ function ProductFormDialog({
     };
     if (!payload.name) return toast.error("Name is required");
     setLoading(true);
-    let error;
-    if (existing) {
-      ({ error } = await supabase
-        .from("products" as never)
-        .update(payload as never)
-        .eq("id", existing.id));
-    } else {
-      ({ error } = await supabase.from("products" as never).insert(payload as never));
+    try {
+      const { error } = existing
+        ? await supabase
+            .from("products" as never)
+            .update(payload as never)
+            .eq("id", existing.id)
+        : await supabase.from("products" as never).insert(payload as never);
+      if (error) throw error;
+      toast.success(existing ? "Product updated" : "Product added");
+      onDone();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Product could not be saved.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-    if (error) return toast.error((error as { message: string }).message);
-    toast.success(existing ? "Product updated" : "Product added");
-    onDone();
   }
 
   return (
@@ -506,7 +509,7 @@ function ProductFormDialog({
                   <SelectValue placeholder="Select…" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value={NO_SELECTION_VALUE}>None</SelectItem>
                   {categories.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}

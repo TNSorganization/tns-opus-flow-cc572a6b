@@ -28,6 +28,7 @@ import { formatDual } from "@/lib/currency";
 import { useCurrentRoles, isManager } from "@/hooks/use-current-role";
 import { fetchActiveProfiles } from "@/lib/profiles";
 import { ModuleErrorState } from "@/components/module-error-state";
+import { fromSelectValue, NO_SELECTION_VALUE, toSelectValue } from "@/lib/select-value";
 
 export const Route = createFileRoute("/_authenticated/logistics")({
   component: LogisticsPage,
@@ -380,7 +381,7 @@ function ItemFormDialog({
 }) {
   const [loading, setLoading] = useState(false);
   const [state, setState] = useState(existing?.state ?? "good");
-  const [responsibleId, setResponsibleId] = useState(existing?.responsible_user_id ?? "");
+  const [responsibleId, setResponsibleId] = useState(toSelectValue(existing?.responsible_user_id));
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -397,7 +398,7 @@ function ItemFormDialog({
       rent_amount: Number(fd.get("rent_amount")) || null,
       rent_start_at: String(fd.get("rent_start_at") ?? "") || null,
       rent_end_at: String(fd.get("rent_end_at") ?? "") || null,
-      responsible_user_id: responsibleId || null,
+      responsible_user_id: fromSelectValue(responsibleId),
       notes: String(fd.get("notes") ?? "").trim() || null,
       wear_tear_reset_at: existing?.wear_tear_reset_at ?? new Date().toISOString(),
     };
@@ -518,7 +519,7 @@ function ItemFormDialog({
                       <SelectValue placeholder="Select person…" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value={NO_SELECTION_VALUE}>None</SelectItem>
                       {people.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.full_name || p.email}
