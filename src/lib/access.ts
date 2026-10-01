@@ -7,3 +7,10 @@ export function normalizeEmail(value: string) {
 export function isTrustedOwnerEmail(value?: string | null) {
   return normalizeEmail(value ?? "") === TRUSTED_OWNER_EMAIL;
 }
+
+export function canSignUpWithoutMatricule(
+  email: string | null | undefined,
+  bootstrapAvailable: boolean,
+) {
+  return bootstrapAvailable || isTrustedOwnerEmail(email);
+}

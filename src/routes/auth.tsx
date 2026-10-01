@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { isTrustedOwnerEmail, normalizeEmail } from "@/lib/access";
+import { canSignUpWithoutMatricule, isTrustedOwnerEmail, normalizeEmail } from "@/lib/access";
 import { authErrorMessage, passwordIssue } from "@/lib/auth-flow";
 import { getAppUrl } from "@/lib/app-url";
 import { getSessionWithTimeout, withTimeout } from "@/lib/auth-session";
@@ -33,6 +33,7 @@ function AuthPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
   const [signupEmail, setSignupEmail] = useState("");
+  const [bootstrapAvailable, setBootstrapAvailable] = useState<boolean | null>(null);
   const trustedOwnerSignup = isTrustedOwnerEmail(signupEmail);
   const passwordChanged = new URL(window.location.href).searchParams.get("password") === "updated";
 
@@ -45,6 +46,16 @@ function AuthPage() {
       })
       .catch(() => {
         // Keep the form usable if restoring an old session times out.
+      });
+
+    withTimeout(supabase.rpc("is_admin_bootstrap_available"), 10_000)
+      .then(({ data: available, error }) => {
+        if (error) throw error;
+        if (active) setBootstrapAvailable(available === true);
+      })
+      .catch(() => {
+        // Fail closed: if setup cannot be checked, regular signups still need a matricule.
+        if (active) setBootstrapAvailable(false);
       });
 
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
@@ -120,18 +131,20 @@ function AuthPage() {
     const password = String(form.get("password") ?? "");
     const matricule = normalizeMatriculeCode(String(form.get("matricule") ?? ""));
     const trustedOwner = isTrustedOwnerEmail(email);
+    const bootstrapAdmin = bootstrapAvailable === true;
+    const matriculeExempt = canSignUpWithoutMatricule(email, bootstrapAdmin);
     const issue = passwordIssue(password);
 
     setFormError(null);
     setConfirmationEmail(null);
     if (issue) return setFormError(issue);
-    if (!trustedOwner && !matricule) {
+    if (!matriculeExempt && !matricule) {
       return setFormError("Enter the matricule issued to you by TNS.");
     }
     setPending("signup");
 
     try {
-      if (trustedOwner) {
+      if (matriculeExempt) {
         clearPendingMatricule();
       } else {
         const valid = await validateMatricule(matricule, email);
@@ -158,14 +171,14 @@ function AuthPage() {
       if (error) throw error;
 
       if (data.user?.identities?.length === 0) {
-        clearPendingMatricule(trustedOwner ? undefined : matricule);
+        clearPendingMatricule(matriculeExempt ? undefined : matricule);
         setFormError("An account already exists for this email. Sign in or reset its password.");
         return;
       }
 
       if (data.session) {
-        if (trustedOwner) {
-          toast.success("Owner account created. Welcome to Opus.");
+        if (matriculeExempt) {
+          toast.success("Administrator account created. Welcome to Opus.");
           navigate({ to: "/home", replace: true });
         } else {
           toast.success("Account created. Confirm your matricule to unlock the workspace.");
@@ -175,7 +188,7 @@ function AuthPage() {
         setConfirmationEmail(email);
       }
     } catch (error) {
-      clearPendingMatricule(trustedOwner ? undefined : matricule);
+      clearPendingMatricule(matriculeExempt ? undefined : matricule);
       setFormError(authErrorMessage(error));
     } finally {
       setPending(null);
@@ -211,7 +224,9 @@ function AuthPage() {
       description="Use your TNS account to enter the workspace. Passwords are case-sensitive and are never trimmed or rewritten."
       footer={
         <p className="text-center text-xs leading-5 text-muted-foreground">
-          Need access? Ask your TNS administrator for a matricule.
+          {bootstrapAvailable
+            ? "The first account becomes the workspace administrator."
+            : "Need access? Ask your TNS administrator for a matricule."}
         </p>
       }
     >
@@ -356,6 +371,25 @@ function AuthPage() {
                   No matricule is required for this organization email.
                 </p>
               </div>
+            ) : bootstrapAvailable === null ? (
+              <div
+                className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground"
+                role="status"
+              >
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
+                Checking whether this is the first account...
+              </div>
+            ) : bootstrapAvailable ? (
+              <div
+                className="rounded-xl border border-brand-success/30 bg-brand-success/10 p-3 text-sm"
+                role="status"
+              >
+                <p className="font-semibold text-foreground">Create the first administrator</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  No matricule is required. This account will be able to issue matricules to the
+                  rest of the team.
+                </p>
+              </div>
             ) : (
               <div className="space-y-2">
                 <Label htmlFor="signup-matricule">Matricule</Label>
@@ -372,7 +406,11 @@ function AuthPage() {
                 />
               </div>
             )}
-            <Button type="submit" className="h-11 w-full" disabled={pending !== null}>
+            <Button
+              type="submit"
+              className="h-11 w-full"
+              disabled={pending !== null || (!trustedOwnerSignup && bootstrapAvailable === null)}
+            >
               {pending === "signup" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (

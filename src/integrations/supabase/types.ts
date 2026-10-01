@@ -870,6 +870,10 @@ export type Database = {
         Returns: boolean;
       };
       is_active: { Args: { _uid: string }; Returns: boolean };
+      is_admin_bootstrap_available: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
       is_ceo: { Args: { _uid: string }; Returns: boolean };
       is_finance: { Args: { _user_id: string }; Returns: boolean };
       is_manager: { Args: { _user_id: string }; Returns: boolean };

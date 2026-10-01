@@ -57,7 +57,7 @@ bunx supabase link --project-ref <project-ref>
 bunx supabase db push
 ```
 
-The exact Auth email `tnsorganization@gmail.com` is bootstrapped as the TNS owner by the database and does not require a matricule. The rule reads the protected `auth.users.email` field, not editable user metadata; all other accounts still require a valid matricule.
+The first Auth account is atomically bootstrapped as the workspace CEO and does not require a matricule, allowing that administrator to issue matricules to later users. The exact Auth email `tnsorganization@gmail.com` is also a durable TNS owner account; that rule reads the protected `auth.users.email` field, not editable user metadata.
 
 The migration in [`supabase/migrations`](supabase/migrations) adds the server-side authorization, account activation, attendance, finance, notification, role-management, and storage protections used by the application. The browser includes temporary compatibility fallbacks so it can still connect while an existing project is being migrated, but those fallbacks are not a substitute for applying the database migration.
 
